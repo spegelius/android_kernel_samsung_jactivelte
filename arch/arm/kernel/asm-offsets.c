@@ -22,6 +22,7 @@
 #include <asm/procinfo.h>
 #include <asm/hardware/cache-l2x0.h>
 #include <linux/kbuild.h>
+#include <asm-generic/rwsem.h>
 
 /*
  * Make sure that the compiler and target are compatible.
