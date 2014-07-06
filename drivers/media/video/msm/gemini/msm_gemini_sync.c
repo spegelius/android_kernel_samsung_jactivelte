@@ -22,10 +22,9 @@
 #include "msm_gemini_common.h"
 #include <mach/msm_bus.h>
 #include <mach/msm_bus_board.h>
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 #include <linux/delay.h>
-#endif
 
+#  define UINT32_MAX    (4294967295U)
 static int release_buf;
 
 /* size is based on 4k page size */
@@ -44,7 +43,7 @@ inline void msm_gemini_q_init(char const *name, struct msm_gemini_q *q_p)
 
 inline void *msm_gemini_q_out(struct msm_gemini_q *q_p)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	struct msm_gemini_q_entry *q_entry_p = NULL;
 	void *data = NULL;
 
@@ -70,7 +69,7 @@ inline void *msm_gemini_q_out(struct msm_gemini_q *q_p)
 
 inline int msm_gemini_q_in(struct msm_gemini_q *q_p, void *data)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 
 	struct msm_gemini_q_entry *q_entry_p;
 
@@ -269,9 +268,7 @@ void msm_gemini_err_irq(struct msm_gemini_device *pgmn_dev,
 	if (!rc)
 		GMN_PR_ERR("%s:%d] err err\n", __func__, __LINE__);
 
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	pgmn_dev->core_reset = 1;
-#endif
 	return;
 }
 
@@ -586,16 +583,13 @@ int msm_gemini_input_buf_enqueue(struct msm_gemini_device *pgmn_dev,
 		return -1;
 	}
 
-
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	GMN_DBG("%s:%d] 0x%08x %d mode %d\n", __func__, __LINE__,
-			(int) buf_cmd.vaddr, buf_cmd.y_len, pgmn_dev->op_mode);
-#else
-	GMN_DBG("%s:%d] 0x%08x %d\n", __func__, __LINE__,
-			(int) buf_cmd.vaddr, buf_cmd.y_len);
-#endif
+		(int) buf_cmd.vaddr, buf_cmd.y_len, pgmn_dev->op_mode);
 
 	if (pgmn_dev->op_mode == MSM_GEMINI_MODE_REALTIME_ENCODE) {
+		if(buf_cmd.y_off == 0)
+			return 0;
+
 		rc = msm_iommu_map_contig_buffer(
 			(unsigned long)buf_cmd.y_off, CAMERA_DOMAIN, GEN_POOL,
 			((buf_cmd.y_len + buf_cmd.cbcr_len + 4095) & (~4095)),
@@ -733,9 +727,7 @@ int __msm_gemini_open(struct msm_gemini_device *pgmn_dev)
 	pgmn_dev->max_out_size = g_max_out_size;
 	pgmn_dev->out_frag_cnt = 0;
 	pgmn_dev->bus_perf_client = 0;
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	pgmn_dev->core_reset = 0;
-#endif
 
 	if (p_bus_scale_data) {
 		GMN_DBG("%s:%d] register bus client", __func__, __LINE__);
@@ -770,17 +762,15 @@ int __msm_gemini_release(struct msm_gemini_device *pgmn_dev)
 			&pgmn_dev->out_buf.handle);
 	}
 
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	if (pgmn_dev->core_reset) {
 		GMN_PR_ERR(KERN_ERR "gemini core reset cfg %x mode %d",
-				msm_gemini_io_r(0x8),
-				pgmn_dev->op_mode);
+			msm_gemini_io_r(0x8),
+			pgmn_dev->op_mode);
 		wmb();
 		msm_gemini_io_w(0x4, 0x8000);
 		msleep(5);
 		wmb();
 	}
-#endif
 	msm_gemini_q_cleanup(&pgmn_dev->evt_q);
 	msm_gemini_q_cleanup(&pgmn_dev->output_rtn_q);
 	msm_gemini_outbuf_q_cleanup(&pgmn_dev->output_buf_q);
@@ -831,7 +821,7 @@ int msm_gemini_ioctl_hw_cmds(struct msm_gemini_device *pgmn_dev,
 	void * __user arg)
 {
 	int is_copy_to_user;
-	int len;
+	uint32_t len;
 	uint32_t m;
 	struct msm_gemini_hw_cmds *hw_cmds_p;
 	struct msm_gemini_hw_cmd *hw_cmd_p;
@@ -839,6 +829,12 @@ int msm_gemini_ioctl_hw_cmds(struct msm_gemini_device *pgmn_dev,
 	if (copy_from_user(&m, arg, sizeof(m))) {
 		GMN_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
 		return -EFAULT;
+	}
+	if ((m == 0) || (m > ((UINT32_MAX-sizeof(struct msm_gemini_hw_cmds))/
+		sizeof(struct msm_gemini_hw_cmd)))) {
+		GMN_PR_ERR("%s:%d] outof range of hwcmds\n",
+			 __func__, __LINE__);
+		return -EINVAL;
 	}
 
 	len = sizeof(struct msm_gemini_hw_cmds) +
@@ -961,11 +957,7 @@ int msm_gemini_ioctl_reset(struct msm_gemini_device *pgmn_dev,
 		return -EFAULT;
 	}
 
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	pgmn_dev->op_mode = MSM_GEMINI_MODE_OFFLINE_ENCODE;
-#else
-	pgmn_dev->op_mode = ctrl_cmd.type;
-#endif
 
 	rc = msm_gemini_core_reset(pgmn_dev->op_mode, pgmn_dev->base,
 		resource_size(pgmn_dev->mem));

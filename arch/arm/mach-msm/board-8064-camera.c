@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,6 +19,7 @@
 #include <mach/camera.h>
 #include <mach/msm_bus_board.h>
 #include <mach/gpiomux.h>
+#include <mach/socinfo.h>
 
 #if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 #include <mach/pmic.h>
@@ -80,7 +81,7 @@ static struct gpiomux_setting cam_settings[] = {
 
 	{
 		.func = GPIOMUX_FUNC_1, /*active 1*/
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		.drv = GPIOMUX_DRV_4MA,
 #else
 		.drv = GPIOMUX_DRV_2MA,
@@ -370,8 +371,6 @@ static int get_system_rev(void)
 static void cam_ldo_power_on(void)
 {
 	int ret = 0;
-	int cam_type = 0;
-	
 	printk(KERN_DEBUG "[JC] %s: In\n", __func__);
 
 	printk(KERN_DEBUG "[JC] %s: system_rev=%d\n", __func__, system_rev);
@@ -416,22 +415,9 @@ static void cam_ldo_power_on(void)
 			__func__);
 	}
 
-	cam_type = gpio_get_value(GPIO_CAM_SENSOR_DET);
-
-	printk(KERN_DEBUG "[JC] %s: SENSOR TYPE = %d\n", __func__, cam_type);
-
 	/* CAM_DVDD1.1V_1.2V*/
 	l28 = regulator_get(NULL, "8921_l28");
-
-	if (cam_type == 1) {
-		printk(KERN_DEBUG "[JC] %s: Sony Sensor 1.1V", __func__);
-		regulator_set_voltage(l28, 1100000, 1100000);
-	}
-	else {
-		printk(KERN_DEBUG "[JC] %s: LSI Sensor 1.2V", __func__);
-		regulator_set_voltage(l28, 1200000, 1200000);	
-	}
-	
+	regulator_set_voltage(l28, 1100000, 1100000);
 	ret = regulator_enable(l28);
 	if (ret)
 		printk(KERN_DEBUG "error enabling regulator 8921_l28\n");
@@ -530,7 +516,11 @@ static void cam_ldo_power_on_sub(void)
 	usleep(1*1000);
 
 	l28 = regulator_get(NULL, "8921_l28");
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	regulator_set_voltage(l28, 1200000, 1200000);
+#else
+    regulator_set_voltage(l28, 1100000, 1100000);
+#endif
 	ret = regulator_enable(l28);
 	if (ret)
 		printk(KERN_DEBUG "error enabling regulator 8921_l28 \n");
@@ -838,7 +828,6 @@ static struct msm_bus_vectors cam_preview_vectors[] = {
 		.src = MSM_BUS_MASTER_VFE,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab  = 27648000,
-		.ib  = 110592000,
 	},
 	{
 		.src = MSM_BUS_MASTER_VPE,
@@ -858,8 +847,8 @@ static struct msm_bus_vectors cam_video_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_VFE,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
-		.ab  = 274406400,
-		.ib  = 561807360,
+		.ab  = 600000000,
+		.ib  = 2656000000UL,
 	},
 	{
 		.src = MSM_BUS_MASTER_VPE,
@@ -879,8 +868,8 @@ static struct msm_bus_vectors cam_snapshot_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_VFE,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
-		.ab  = 274423680,
-		.ib  = 1097694720,
+		.ab  = 600000000,
+		.ib  = 2656000000UL,
 	},
 	{
 		.src = MSM_BUS_MASTER_VPE,
@@ -900,8 +889,8 @@ static struct msm_bus_vectors cam_zsl_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_VFE,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
-		.ab  = 302071680,
-		.ib  = 1208286720,
+		.ab  = 600000000,
+		.ib  = 2656000000UL,
 	},
 	{
 		.src = MSM_BUS_MASTER_VPE,
@@ -1168,6 +1157,37 @@ static struct msm_actuator_info msm_act_main_cam_2_info = {
 static struct msm_camera_i2c_conf apq8064_front_cam_i2c_conf = {
 	.use_i2c_mux = 0,
 };
+
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+static struct msm_camera_sensor_flash_data flash_imx135 = {
+	.flash_type = MSM_CAMERA_FLASH_NONE,
+};
+
+static struct msm_camera_csi_lane_params imx135_csi_lane_params = {
+	.csi_lane_assign = 0xE4,
+	.csi_lane_mask = 0xF,
+};
+
+static struct msm_camera_sensor_platform_info sensor_board_info_imx135 = {
+	.mount_angle    = 90,
+	.cam_vreg = apq_8064_cam_vreg,
+	.num_vreg = ARRAY_SIZE(apq_8064_cam_vreg),
+	.gpio_conf = &apq8064_back_cam_gpio_conf,
+	.i2c_conf = &apq8064_back_cam_i2c_conf,
+	.csi_lane_params = &imx135_csi_lane_params,
+};
+
+static struct msm_camera_sensor_info msm_camera_sensor_imx135_data = {
+	.sensor_name    = "imx135",
+	.pdata  = &msm_camera_csi_device_data[0],
+	.flash_data = &flash_imx135,
+	.sensor_platform_info = &sensor_board_info_imx135,
+	.csi_if = 1,
+	.camera_type = BACK_CAMERA_2D,
+	.sensor_type = BAYER_SENSOR,
+	.actuator_info = &msm_act_main_cam_1_info,
+};
+#endif
 
 static struct msm_camera_sensor_flash_data flash_imx074 = {
 	.flash_type	= MSM_CAMERA_FLASH_LED,
@@ -1516,6 +1536,7 @@ struct pm_gpio cam_init_in_cfg = {
 	.output_value = 0,
 };
 
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 struct pm_gpio cam_rear_det = {
 		.direction		= PM_GPIO_DIR_IN,
 		.pull			= PM_GPIO_PULL_NO,
@@ -1526,6 +1547,7 @@ struct pm_gpio cam_rear_det = {
 		.output_buffer		= PM_GPIO_OUT_BUF_CMOS,
 		.output_value		= 0,
 };
+#endif
 
 void __init apq8064_init_cam(void)
 {
@@ -1546,7 +1568,9 @@ void __init apq8064_init_cam(void)
 #endif
 
 	pm8xxx_gpio_config(GPIO_CAM_A_EN2, &cam_init_out_cfg);
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	pm8xxx_gpio_config(GPIO_CAM_SENSOR_DET, &cam_rear_det);
+#endif
 
 	/* temp: need to set low because bootloader make high signal. */
 	pmic_gpio_ctrl(GPIO_CAM_VT_EN, 0);
@@ -1579,6 +1603,12 @@ static struct i2c_board_info apq8064_camera_i2c_boardinfo[] = {
 	I2C_BOARD_INFO("imx074", 0x10),
 	.platform_data = &msm_camera_sensor_imx074_data,
 	},
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+	{
+	I2C_BOARD_INFO("imx135", 0x10),
+	.platform_data = &msm_camera_sensor_imx135_data,
+	},
+#endif
 	{
 	I2C_BOARD_INFO("mt9m114", 0x48),
 	.platform_data = &msm_camera_sensor_mt9m114_data,

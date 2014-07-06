@@ -412,7 +412,7 @@ static int vpe_update_scaler(struct msm_pp_crop *pcrop)
 int msm_vpe_is_busy(void)
 {
 	int busy = 0;
-	unsigned long flags = 0;
+	unsigned long flags;
 	spin_lock_irqsave(&vpe_ctrl->lock, flags);
 	if (vpe_ctrl->state == VPE_STATE_ACTIVE)
 		busy = 1;
@@ -423,7 +423,7 @@ int msm_vpe_is_busy(void)
 static int msm_send_frame_to_vpe(void)
 {
 	int rc = 0;
-	unsigned long flags = 0;
+	unsigned long flags;
 	unsigned long srcP0, srcP1, outP0, outP1;
 	struct msm_mctl_pp_frame_info *frame_info = vpe_ctrl->pp_frame_info;
 
@@ -469,7 +469,7 @@ static int msm_send_frame_to_vpe(void)
 
 static void vpe_send_outmsg(void)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	struct v4l2_event v4l2_evt;
 	struct msm_queue_cmd *event_qcmd;
 	spin_lock_irqsave(&vpe_ctrl->lock, flags);
@@ -552,6 +552,11 @@ int vpe_enable(uint32_t clk_rate, struct msm_cam_media_controller *mctl)
 		goto vpe_clk_failed;
 
 #ifdef CONFIG_MSM_IOMMU
+	if (mctl->domain == NULL) {
+		pr_err("%s: iommu domain not initialized\n", __func__);
+		rc = -EINVAL;
+		goto src_attach_failed;
+	}
 	rc = iommu_attach_device(mctl->domain, vpe_ctrl->iommu_ctx_src);
 	if (rc < 0) {
 		pr_err("%s: Device attach failed\n", __func__);

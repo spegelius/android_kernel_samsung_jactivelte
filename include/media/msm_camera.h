@@ -579,6 +579,7 @@ struct msm_camera_cfg_cmd {
 #define CMD_AXI_STOP   0xE2
 #define CMD_AXI_RESET  0xE3
 #define CMD_AXI_ABORT  0xE4
+#define CMD_AXI_STOP_RECOVERY  0xE5
 
 
 
@@ -917,7 +918,8 @@ struct msm_stats_buf {
 #define MSM_V4L2_PID_MMAP_INST              (V4L2_CID_PRIVATE_BASE+17)
 #define MSM_V4L2_PID_PP_PLANE_INFO          (V4L2_CID_PRIVATE_BASE+18)
 #define MSM_V4L2_PID_PREVIEW_SIZE           (V4L2_CID_PRIVATE_BASE+19)
-#define MSM_V4L2_PID_MAX                    MSM_V4L2_PID_PREVIEW_SIZE
+#define MSM_V4L2_PID_AVTIMER                (V4L2_CID_PRIVATE_BASE+20)
+#define MSM_V4L2_PID_MAX                     MSM_V4L2_PID_AVTIMER
 
 /* camera operation mode for video recording - two frame output queues */
 #define MSM_V4L2_CAM_OP_DEFAULT         0
@@ -1030,8 +1032,12 @@ struct msm_snapshot_pp_status {
 #define CFG_EEPROM_DIRECT_DATA_ERASE  57
 #define CFG_SET_STREAMING_MODE        58
 #define CFG_SET_VISION_AE             59
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 #define CFG_FINAL_AF				  60 	//SEMCO Request by Lizk
 #define CFG_MAX                       61
+#else
+#define CFG_MAX                       60
+#endif
 
 
 
@@ -1331,8 +1337,11 @@ struct sensor_pict_fps {
 };
 
 struct exp_gain_cfg {
-/*	uint16_t gain;*/
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	uint32_t gain;
+#else
+	uint16_t gain;
+#endif
 	uint32_t line;
 };
 
@@ -1938,7 +1947,9 @@ struct msm_calib_af {
 	uint16_t inf_dac2;		/*1.05M*/	
 	uint16_t start_dac;
 	uint16_t pid_dac;		/* Randy PID */
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	uint16_t cal_offset_dac ;		/* SEMCO by Liz 05112013 */
+#endif
 };
 
 struct msm_calib_lsc {
@@ -2455,7 +2466,9 @@ struct intf_mctl_mapping_cfg {
 #define EXT_CAM_SET_RAW	44
 #define EXT_CAM_RESUME_PREVIEW 45
 #define EXT_CAM_SET_FACTORY_BIN 46
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 #define EXT_CAM_START_GOLF_SHOT 47
 #define EXT_CAM_STOP_GOLF_SHOT 48
+#endif
 
 #endif /* __LINUX_MSM_CAMERA_H */

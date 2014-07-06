@@ -163,11 +163,14 @@
 /* For DBPC bit 0 is set to zero and other's 1 */
 #define DBPC_MASK 0xFFFFFFFE
 
-/* For DBPC bit 1 is set to zero and other's 1 */
+/* For DBCC bit 1 is set to zero and other's 1 */
 #define DBCC_MASK 0xFFFFFFFD
 
+/* For ABCC bit 1 is set to zero and other's 1 */
+#define ABCC_MASK 0xFFFFFFFB
+
 /* For DBPC/ABF/DBCC/ABCC bits are set to 1 all others 0 */
-#define DEMOSAIC_MASK 0xF
+#define DEMOSAIC_MASK 0x10F
 
 /* For MCE enable bit 28 set to zero and other's 1 */
 #define MCE_EN_MASK 0xEFFFFFFF
@@ -200,6 +203,8 @@
 #define HFR_MODE_OFF 1
 #define VFE_FRAME_SKIP_PERIOD_MASK 0x0000001F /*bits 0 -4*/
 
+#define VFE_RELOAD_ALL_WRITE_MASTERS 0x00003FFF
+
 enum VFE32_DMI_RAM_SEL {
 	NO_MEM_SELECTED          = 0,
 	BLACK_LUT_RAM_BANK0      = 0x1,
@@ -225,7 +230,6 @@ enum VFE32_DMI_RAM_SEL {
 	ROLLOFF_RAM1_BANK1       = 0x15,
 };
 
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 enum vfe_output_state {
 	VFE_STATE_IDLE,
 	VFE_STATE_START_REQUESTED,
@@ -235,15 +239,6 @@ enum vfe_output_state {
 	VFE_STATE_HW_STOP_REQUESTED,
 	VFE_STATE_HW_STOPPED,
 };
-#else
-enum vfe_output_state {
-	VFE_STATE_IDLE,
-	VFE_STATE_START_REQUESTED,
-	VFE_STATE_STARTED,
-	VFE_STATE_STOP_REQUESTED,
-	VFE_STATE_STOPPED,
-};
-#endif
 
 #define V32_CAMIF_OFF             0x000001E4
 #define V32_CAMIF_LEN             32
@@ -319,6 +314,9 @@ enum vfe_output_state {
 #define V33_PCA_ROLL_OFF_CFG_OFF2             0x000007A8
 #define V33_PCA_ROLL_OFF_TABLE_SIZE           (17 + (13*4))
 #define V33_PCA_ROLL_OFF_LUT_BANK_SEL_MASK    0x00010000
+
+#define V33_ABCC_LUT_TABLE_SIZE       512
+#define V33_ABCC_LUT_BANK_SEL_MASK    0x00000100
 
 #define V32_COLOR_COR_OFF 0x00000388
 #define V32_COLOR_COR_LEN 52
@@ -554,12 +552,13 @@ enum VFE_YUV_INPUT_COSITING_MODE {
 };
 
 #define VFE32_GAMMA_NUM_ENTRIES  64
-
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 #define VFE32_GAMMA_CH0_G_POS    0
 
 #define VFE32_GAMMA_CH1_B_POS    32
 
 #define VFE32_GAMMA_CH2_R_POS    64
+#endif
 
 #define VFE32_LA_TABLE_LENGTH    64
 
@@ -838,7 +837,9 @@ struct vfe32_output_ch {
 #define VFE32_IMASK_STATS_IHIST_BUS_OVFL      (0x00000001<<20)
 #define VFE32_IMASK_STATS_SKIN_BHIST_BUS_OVFL (0x00000001<<21)
 #define VFE32_IMASK_AXI_ERROR                 (0x00000001<<22)
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 #define VFE32_IMASK_BUS_OVFL_ERROR		0x005FFF00
+#endif
 #define VFE_COM_STATUS 0x000FE000
 
 struct vfe32_output_path {
@@ -912,6 +913,7 @@ struct vfe32_frame_extra {
 #define VFE_BUS_STATS_SKIN_BHIST_WR_PONG_ADDR    0x00000140
 #define VFE_BUS_STATS_SKIN_BHIST_UB_CFG          0x00000144
 #define VFE_CAMIF_COMMAND               0x000001E0
+#define VFE_CAMIF_FRAME_CFG		0x000001EC
 #define VFE_CAMIF_STATUS                0x00000204
 #define VFE_REG_UPDATE_CMD              0x00000260
 #define VFE_DEMUX_GAIN_0                0x00000288
@@ -934,7 +936,9 @@ struct vfe32_frame_extra {
 #define VFE_DMI_ADDR                    0x0000059C
 #define VFE_DMI_DATA_HI                 0x000005A0
 #define VFE_DMI_DATA_LO                 0x000005A4
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 #define VFE_AXI_CFG                     0x00000600
+#endif
 #define VFE_BUS_IO_FORMAT_CFG           0x000006F8
 #define VFE_PIXEL_IF_CFG                0x000006FC
 #define VFE_RDI0_CFG                    0x00000734
@@ -944,8 +948,9 @@ struct vfe32_frame_extra {
 
 #define VFE33_DMI_DATA_HI               0x000005A0
 #define VFE33_DMI_DATA_LO               0x000005A4
-
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 #define VFE_AXI_CFG_MASK                0x80000000
+#endif
 
 #define VFE32_OUTPUT_MODE_PT			BIT(0)
 #define VFE32_OUTPUT_MODE_S			BIT(1)
@@ -999,7 +1004,9 @@ struct vfe_share_ctrl_t {
 	uint16_t cmd_type;
 	uint8_t vfe_reset_flag;
 	uint8_t dual_enabled;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	uint8_t default_dual_enabled;
+#endif
 	uint8_t lp_mode;
 
 	uint8_t axi_ref_cnt;
@@ -1022,7 +1029,9 @@ struct vfe_share_ctrl_t {
 	atomic_t rdi2_update_ack_pending;
 
 	uint8_t stream_error;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	uint32_t rdi_comp;
+#endif
 
 };
 
@@ -1043,6 +1052,7 @@ struct axi_ctrl_t {
 	struct vfe_share_ctrl_t *share_ctrl;
 	struct device *iommu_ctx_imgwr;
 	struct device *iommu_ctx_misc;
+	uint32_t simultaneous_sof_frame;
 };
 
 struct vfe32_ctrl_type {
@@ -1056,6 +1066,7 @@ struct vfe32_ctrl_type {
 	int8_t update_rolloff;
 	int8_t update_la;
 	int8_t update_gamma;
+	int8_t update_abcc;
 
 	struct vfe_share_ctrl_t *share_ctrl;
 

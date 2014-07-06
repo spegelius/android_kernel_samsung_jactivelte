@@ -561,7 +561,7 @@ int msm_camera_flash_pmic_gpio(
 	printk(">>>>> msm_camera_flash_pmic_gpio: %d\n", led_state);
 
 	switch (led_state) {
-		case MSM_CAMERA_LED_LOW:		
+		case MSM_CAMERA_LED_LOW:
 			printk("LED_LOW\n");
 			rc = pmic_gpio->pmic_set_func(pmic_gpio->led_src_1, 1); /* flash for a short time */
 			//rc = pmic_gpio->pmic_set_func(pmic_gpio->led_src_2, 1);
@@ -598,15 +598,10 @@ int32_t msm_camera_flash_set_led_state(
 	struct msm_camera_sensor_flash_data *fdata, unsigned led_state)
 {
 	int32_t rc;
-#if 0//defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
-	printk(">>>>> %s Enter fdata->flash_type : %d \n", __func__, fdata->flash_type);
-#endif
+
 	if (fdata->flash_type != MSM_CAMERA_FLASH_LED ||
 		fdata->flash_src == NULL)
 		return -ENODEV;
-#if 0//defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
-	printk(">>>>> %s Enter led_state : %d \n", __func__, led_state);
-#endif
 
 	switch (fdata->flash_src->flash_sr_type) {
 	case MSM_CAMERA_FLASH_SRC_PMIC:
@@ -669,7 +664,7 @@ static int msm_strobe_flash_xenon_charge(int32_t flash_charge,
 
 static void strobe_flash_xenon_recharge_handler(unsigned long data)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	struct msm_camera_sensor_strobe_flash_data *sfdata =
 		(struct msm_camera_sensor_strobe_flash_data *)data;
 
@@ -695,7 +690,7 @@ static irqreturn_t strobe_flash_charge_ready_irq(int irq_num, void *data)
 static int msm_strobe_flash_xenon_init(
 	struct msm_camera_sensor_strobe_flash_data *sfdata)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	int rc = 0;
 
 	spin_lock_irqsave(&sfdata->spin_lock, flags);
@@ -729,7 +724,7 @@ go_out:
 static int msm_strobe_flash_xenon_release
 (struct msm_camera_sensor_strobe_flash_data *sfdata, int32_t final_release)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 
 	spin_lock_irqsave(&sfdata->spin_lock, flags);
 	if (sfdata->state > 0) {
