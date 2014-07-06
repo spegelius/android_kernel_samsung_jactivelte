@@ -21,6 +21,7 @@
 #include <linux/proc_fs.h>
 #include <linux/vmalloc.h>
 #include <linux/wakelock.h>
+#include <linux/avtimer.h>
 
 #include <media/v4l2-dev.h>
 #include <media/v4l2-ioctl.h>
@@ -336,7 +337,6 @@ static int msm_mctl_cmd(struct msm_cam_media_controller *p_mctl,
 
 	case MSM_CAM_IOCTL_GET_ACTUATOR_INFO: {
 		struct msm_actuator_cfg_data cdata;
-		pr_err("%s: %d, MSM_CAM_IOCTL_GET_ACTUATOR_INFO \n", __func__, __LINE__);
 		if (copy_from_user(&cdata,
 			(void *)argp,
 			sizeof(struct msm_actuator_cfg_data))) {
@@ -350,7 +350,7 @@ static int msm_mctl_cmd(struct msm_cam_media_controller *p_mctl,
 			struct msm_camera_sensor_info *sdata;
 
 			sdata = p_mctl->sdata;
-			pr_err("%s: Act_cam_Name %d\n", __func__,
+			CDBG("%s: Act_cam_Name %d\n", __func__,
 				sdata->actuator_info->cam_name);
 
 			cdata.is_af_supported = 1;
@@ -358,9 +358,9 @@ static int msm_mctl_cmd(struct msm_cam_media_controller *p_mctl,
 				(enum af_camera_name)sdata->
 				actuator_info->cam_name;
 
-			pr_err("%s: Af Support:%d\n", __func__,
+			CDBG("%s: Af Support:%d\n", __func__,
 				cdata.is_af_supported);
-			pr_err("%s: Act_name:%d\n", __func__, cdata.cfg.cam_name);
+			CDBG("%s: Act_name:%d\n", __func__, cdata.cfg.cam_name);
 
 		}
 		if (copy_to_user((void *)argp,
@@ -412,7 +412,11 @@ static int msm_mctl_cmd(struct msm_cam_media_controller *p_mctl,
 				rc = -EFAULT;
 				break;
 			}
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 			eeprom_data.is_eeprom_supported = 1;	//Check by teddy
+#else
+			eeprom_data.is_eeprom_supported = 0;
+#endif
 			rc = copy_to_user((void *)argp,
 					 &eeprom_data,
 					 sizeof(struct msm_eeprom_cfg_data));
@@ -439,9 +443,6 @@ static int msm_mctl_cmd(struct msm_cam_media_controller *p_mctl,
 
 	case MSM_CAM_IOCTL_FLASH_CTRL: {
 		struct flash_ctrl_data flash_info;
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
-		printk(" >>>>> %s  MSM_CAM_IOCTL_FLASH_CTRL \n", __func__);
-#endif
 		if (copy_from_user(&flash_info, argp, sizeof(flash_info))) {
 			ERR_COPY_FROM_USER();
 			rc = -EFAULT;
@@ -537,6 +538,7 @@ static int msm_mctl_cmd(struct msm_cam_media_controller *p_mctl,
 		}
 		break;
 
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	case MSM_CAM_IOCTL_VFE_STATS_VERSION:
 		{
 			uint32_t vfe_ver_num;
@@ -551,6 +553,7 @@ static int msm_mctl_cmd(struct msm_cam_media_controller *p_mctl,
 				VIDIOC_MSM_VFE_STATS_VERSION, &vfe_ver_num);
 		}
 		break;
+#endif
 
 	case MSM_CAM_IOCTL_AXI_LOW_POWER_MODE:
 		if (p_mctl->axi_sdev) {
@@ -618,10 +621,12 @@ static int msm_mctl_open(struct msm_cam_media_controller *p_mctl,
 			goto act_power_up_failed;
 		}
 
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
         if (sinfo->eeprom_info && sinfo->eeprom_info->type ==
             MSM_EEPROM_SPI) {
             msm_mctl_find_eeprom_subdevs(p_mctl);
         }
+#endif
 
 		if (p_mctl->csic_sdev)
 			csi_info.is_csic = 1;
@@ -664,54 +669,87 @@ static void msm_mctl_release(struct msm_cam_media_controller *p_mctl)
 	struct msm_sensor_ctrl_t *s_ctrl = get_sctrl(p_mctl->sensor_sdev);
 	struct msm_camera_sensor_info *sinfo =
 		(struct msm_camera_sensor_info *) s_ctrl->sensordata;
-	v4l2_subdev_call(p_mctl->sensor_sdev, core, ioctl,
-		VIDIOC_MSM_SENSOR_RELEASE, NULL);
+	mutex_lock(&p_mctl->lock);
+	if (p_mctl->opencnt) {
+		v4l2_subdev_call(p_mctl->sensor_sdev, core, ioctl,
+			VIDIOC_MSM_SENSOR_RELEASE, NULL);
 
-	if (p_mctl->csic_sdev) {
-		v4l2_subdev_call(p_mctl->csic_sdev, core, ioctl,
-			VIDIOC_MSM_CSIC_RELEASE, NULL);
+		if (p_mctl->csic_sdev) {
+			v4l2_subdev_call(p_mctl->csic_sdev, core, ioctl,
+				VIDIOC_MSM_CSIC_RELEASE, NULL);
+		}
+
+		if (p_mctl->vpe_sdev) {
+			v4l2_subdev_call(p_mctl->vpe_sdev, core, ioctl,
+				VIDIOC_MSM_VPE_RELEASE, NULL);
+		}
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
+		if (p_mctl->ispif_sdev) {
+			v4l2_set_subdev_hostdata(p_mctl->ispif_sdev, p_mctl);
+		            v4l2_subdev_call(p_mctl->ispif_sdev, core, ioctl,
+		                    VIDIOC_MSM_ISPIF_RELEASE, NULL);
+		}
+
+		if (p_mctl->axi_sdev) {
+			v4l2_set_subdev_hostdata(p_mctl->axi_sdev, p_mctl);
+			v4l2_subdev_call(p_mctl->axi_sdev, core, ioctl,
+				VIDIOC_MSM_AXI_RELEASE, NULL);
+		}
+
+			if (p_mctl->csid_sdev) {
+				v4l2_subdev_call(p_mctl->csid_sdev, core, ioctl,
+					VIDIOC_MSM_CSID_RELEASE, NULL);
+			}
+
+		if (p_mctl->csiphy_sdev) {
+			v4l2_subdev_call(p_mctl->csiphy_sdev, core, ioctl,
+				VIDIOC_MSM_CSIPHY_RELEASE,
+				sinfo->sensor_platform_info->csi_lane_params);
+		}
+
+		if (p_mctl->act_sdev) {
+			v4l2_subdev_call(p_mctl->act_sdev, core, s_power, 0);
+			p_mctl->act_sdev = NULL;
+		}
+
+		v4l2_subdev_call(p_mctl->sensor_sdev, core, s_power, 0);
+#else
+		if (p_mctl->axi_sdev) {
+			v4l2_set_subdev_hostdata(p_mctl->axi_sdev, p_mctl);
+			v4l2_subdev_call(p_mctl->axi_sdev, core, ioctl,
+				VIDIOC_MSM_AXI_RELEASE, NULL);
+		}
+
+		if (p_mctl->csiphy_sdev) {
+			v4l2_subdev_call(p_mctl->csiphy_sdev, core, ioctl,
+				VIDIOC_MSM_CSIPHY_RELEASE,
+				sinfo->sensor_platform_info->csi_lane_params);
+		}
+
+		if (p_mctl->csid_sdev) {
+			v4l2_subdev_call(p_mctl->csid_sdev, core, ioctl,
+				VIDIOC_MSM_CSID_RELEASE, NULL);
+		}
+
+		if (p_mctl->act_sdev) {
+			v4l2_subdev_call(p_mctl->act_sdev, core, s_power, 0);
+			p_mctl->act_sdev = NULL;
+		}
+
+		v4l2_subdev_call(p_mctl->sensor_sdev, core, s_power, 0);
+
+		v4l2_subdev_call(p_mctl->ispif_sdev,
+				core, ioctl, VIDIOC_MSM_ISPIF_RELEASE, NULL);
+#endif
+
+		pm_qos_update_request(&p_mctl->pm_qos_req_list,
+					PM_QOS_DEFAULT_VALUE);
+		pm_qos_remove_request(&p_mctl->pm_qos_req_list);
+
+		p_mctl->opencnt--;
+		wake_unlock(&p_mctl->wake_lock);
 	}
-
-	if (p_mctl->vpe_sdev) {
-		v4l2_subdev_call(p_mctl->vpe_sdev, core, ioctl,
-			VIDIOC_MSM_VPE_RELEASE, NULL);
-	}
-
-	if (p_mctl->ispif_sdev) {
-		v4l2_set_subdev_hostdata(p_mctl->ispif_sdev, p_mctl);
-                v4l2_subdev_call(p_mctl->ispif_sdev, core, ioctl,
-                        VIDIOC_MSM_ISPIF_RELEASE, NULL);
-	}
-
-	if (p_mctl->axi_sdev) {
-		v4l2_set_subdev_hostdata(p_mctl->axi_sdev, p_mctl);
-		v4l2_subdev_call(p_mctl->axi_sdev, core, ioctl,
-			VIDIOC_MSM_AXI_RELEASE, NULL);
-	}
-
-	if (p_mctl->csid_sdev) {
-		v4l2_subdev_call(p_mctl->csid_sdev, core, ioctl,
-			VIDIOC_MSM_CSID_RELEASE, NULL);
-	}
-
-	if (p_mctl->csiphy_sdev) {
-		v4l2_subdev_call(p_mctl->csiphy_sdev, core, ioctl,
-			VIDIOC_MSM_CSIPHY_RELEASE,
-			sinfo->sensor_platform_info->csi_lane_params);
-	}
-
-	if (p_mctl->act_sdev) {
-		v4l2_subdev_call(p_mctl->act_sdev, core, s_power, 0);
-		p_mctl->act_sdev = NULL;
-	}
-
-	v4l2_subdev_call(p_mctl->sensor_sdev, core, s_power, 0);
-
-	pm_qos_update_request(&p_mctl->pm_qos_req_list,
-				PM_QOS_DEFAULT_VALUE);
-	pm_qos_remove_request(&p_mctl->pm_qos_req_list);
-
-	wake_unlock(&p_mctl->wake_lock);
+	mutex_unlock(&p_mctl->lock);
 }
 
 int msm_mctl_init_user_formats(struct msm_cam_v4l2_device *pcam)
@@ -890,6 +928,10 @@ static int msm_mctl_dev_open(struct file *f)
 	mutex_init(&pcam_inst->inst_lock);
 	pcam->mctl_node.dev_inst[i] = pcam_inst;
 
+	pcam_inst->avtimerOn = 0;
+	pcam_inst->p_avtimer_msw = NULL;
+	pcam_inst->p_avtimer_lsw = NULL;
+
 	D("%s pcam_inst %p my_index = %d\n", __func__,
 		pcam_inst, pcam_inst->my_index);
 	rc = msm_cam_server_open_mctl_session(pcam,
@@ -990,6 +1032,17 @@ static int msm_mctl_dev_close(struct file *f)
 	pcam_inst->streamon = 0;
 	pcam->mctl_node.use_count--;
 	pcam->mctl_node.dev_inst_map[pcam_inst->image_mode] = NULL;
+
+	if(pcam_inst->avtimerOn){
+	    iounmap(pcam_inst->p_avtimer_lsw);
+	    iounmap(pcam_inst->p_avtimer_msw);
+	    //Turn OFF DSP/Enable power collapse
+#ifdef CONFIG_MSM_AVTIMER
+	    avcs_core_disable_power_collapse(0);
+#endif
+	    pcam_inst->avtimerOn = 0;
+	}
+
 	if (pcam_inst->vbqueue_initialized)
 		vb2_queue_release(&pcam_inst->vid_bufq);
 	D("%s Closing down instance %p ", __func__, pcam_inst);
@@ -1101,6 +1154,18 @@ static int msm_mctl_v4l2_s_ctrl(struct file *f, void *pctx,
 				pcam_inst->plane_info.num_planes,
 				pcam_inst->plane_info.plane[0].size,
 				pcam_inst->plane_info.plane[1].size);
+	} else if (ctrl->id == MSM_V4L2_PID_AVTIMER){
+		pcam_inst->avtimerOn = ctrl->value;
+		D("%s: mmap_inst=(0x%p, %d) AVTimer=%d\n",
+			 __func__, pcam_inst, pcam_inst->my_index, ctrl->value);
+#ifdef CONFIG_MSM_AVTIMER
+		/*Kernel drivers to access AVTimer*/
+		avcs_core_open();
+		/*Turn ON DSP/Disable power collapse*/
+		avcs_core_disable_power_collapse(1);
+#endif
+		pcam_inst->p_avtimer_lsw = ioremap(AVTIMER_LSW_PHY_ADDR, 4);
+		pcam_inst->p_avtimer_msw = ioremap(AVTIMER_MSW_PHY_ADDR, 4);
 	} else
 		pr_err("%s Unsupported S_CTRL Value ", __func__);
 
@@ -1126,6 +1191,7 @@ static int msm_mctl_v4l2_reqbufs(struct file *f, void *pctx,
 		pmctl = msm_cam_server_get_mctl(pcam->mctl_handle);
 		if (pmctl == NULL) {
 			pr_err("%s Invalid mctl ptr", __func__);
+			mutex_unlock(&pcam_inst->inst_lock);
 			return -EINVAL;
 		}
 		pmctl->mctl_vbqueue_init(pcam_inst, &pcam_inst->vid_bufq,
@@ -1619,7 +1685,7 @@ static int msm_mctl_v4l2_subscribe_event(struct v4l2_fh *fh,
 
 	if (sub->type == V4L2_EVENT_ALL)
 		sub->type = V4L2_EVENT_PRIVATE_START+MSM_CAM_APP_NOTIFY_EVENT;
-	rc = v4l2_event_subscribe(fh, sub, 30);
+	rc = v4l2_event_subscribe(fh, sub, 100);
 	if (rc < 0)
 		pr_err("%s: failed for evtType = 0x%x, rc = %d\n",
 						__func__, sub->type, rc);

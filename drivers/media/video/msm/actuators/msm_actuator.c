@@ -12,23 +12,32 @@
 
 #include <linux/module.h>
 #include "msm_actuator.h"
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
+
 #include "hvca_actuator.h"
 
 #undef CDBG
 #define CDBG pr_err
+#endif
 
 static struct msm_actuator_ctrl_t msm_actuator_t;
 static struct msm_actuator msm_vcm_actuator_table;
 static struct msm_actuator msm_piezo_actuator_table;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 static struct msm_actuator hvca_actuator_table;
+#endif
 
 static struct msm_actuator *actuators[] = {
 	&msm_vcm_actuator_table,
 	&msm_piezo_actuator_table,
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	&hvca_actuator_table,
+#endif
 };
 
-bool is_af_final = false; /*SEMCO request by Lizk 05112013*/	
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
+bool is_af_final = false; /*SEMCO request by Lizk 05112013*/
+#endif
 static int32_t msm_actuator_piezo_set_default_focus(
 	struct msm_actuator_ctrl_t *a_ctrl,
 	struct msm_actuator_move_params_t *move_params)
@@ -65,11 +74,13 @@ static int32_t msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 	uint32_t size = a_ctrl->reg_tbl_size, i = 0;
 	int32_t rc = 0;
 	struct msm_camera_i2c_reg_tbl *i2c_tbl = a_ctrl->i2c_reg_tbl;
-	uint8_t hw_reg_write = 1;
 	CDBG("%s: IN\n", __func__);
-	if (a_ctrl->curr_hwparams == hw_params)
-		hw_reg_write = 0;
 	for (i = 0; i < size; i++) {
+		/* check that the index into i2c_tbl cannot grow larger that
+		the allocated size of i2c_tbl */
+		if ((a_ctrl->total_steps + 1) < (a_ctrl->i2c_tbl_index)) {
+			break;
+		}
 		if (write_arr[i].reg_write_type == MSM_ACTUATOR_WRITE_DAC) {
 			value = (next_lens_position <<
 				write_arr[i].data_shift) |
@@ -98,29 +109,19 @@ static int32_t msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 				i2c_byte1 = (value & 0xFF00) >> 8;
 				i2c_byte2 = value & 0xFF;
 			}
-			CDBG("%s: i2c_byte1:0x%x, i2c_byte2:0x%x\n", __func__,
-				i2c_byte1, i2c_byte2);
-			i2c_tbl[a_ctrl->i2c_tbl_index].reg_addr = i2c_byte1;
-			i2c_tbl[a_ctrl->i2c_tbl_index].reg_data = i2c_byte2;
-			i2c_tbl[a_ctrl->i2c_tbl_index].delay = delay;
-			a_ctrl->i2c_tbl_index++;
 		} else {
-			if (hw_reg_write) {
-				i2c_byte1 = write_arr[i].reg_addr;
-				i2c_byte2 = (hw_dword & write_arr[i].hw_mask) >>
-					write_arr[i].hw_shift;
-				CDBG("%s: i2c_byte1:0x%x, i2c_byte2:0x%x\n", __func__,
-					i2c_byte1, i2c_byte2);
-				i2c_tbl[a_ctrl->i2c_tbl_index].reg_addr = i2c_byte1;
-				i2c_tbl[a_ctrl->i2c_tbl_index].reg_data = i2c_byte2;
-				i2c_tbl[a_ctrl->i2c_tbl_index].delay = delay;
-				a_ctrl->i2c_tbl_index++;
-			}
+			i2c_byte1 = write_arr[i].reg_addr;
+			i2c_byte2 = (hw_dword & write_arr[i].hw_mask) >>
+				write_arr[i].hw_shift;
 		}
+		CDBG("%s: i2c_byte1:0x%x, i2c_byte2:0x%x\n", __func__,
+			i2c_byte1, i2c_byte2);
+		i2c_tbl[a_ctrl->i2c_tbl_index].reg_addr = i2c_byte1;
+		i2c_tbl[a_ctrl->i2c_tbl_index].reg_data = i2c_byte2;
+		i2c_tbl[a_ctrl->i2c_tbl_index].delay = delay;
+		a_ctrl->i2c_tbl_index++;
 	}
-	CDBG("%s: OUT\n", __func__);
-	if (rc == 0)
-		a_ctrl->curr_hwparams = hw_params;
+		CDBG("%s: OUT\n", __func__);
 	return rc;
 }
 
@@ -207,8 +208,16 @@ static int32_t msm_actuator_piezo_move_focus(
 	struct msm_actuator_move_params_t *move_params)
 {
 	int32_t dest_step_position = move_params->dest_step_pos;
+	struct damping_params_t ringing_params_kernel;
 	int32_t rc = 0;
 	int32_t num_steps = move_params->num_steps;
+
+	if (copy_from_user(&ringing_params_kernel,
+		&(move_params->ringing_params[0]),
+		sizeof(struct damping_params_t))) {
+			pr_err("copy_from_user failed\n");
+			return -EFAULT;
+	}
 
 	if (num_steps == 0)
 		return rc;
@@ -218,7 +227,7 @@ static int32_t msm_actuator_piezo_move_focus(
 		actuator_parse_i2c_params(a_ctrl,
 		(num_steps *
 		a_ctrl->region_params[0].code_per_step),
-		move_params->ringing_params[0].hw_params, 0);
+		ringing_params_kernel.hw_params, 0);
 
 	rc = msm_camera_i2c_write_table_w_microdelay(&a_ctrl->i2c_client,
 		a_ctrl->i2c_reg_tbl, a_ctrl->i2c_tbl_index,
@@ -246,6 +255,14 @@ static int32_t msm_actuator_move_focus(
 	uint16_t curr_lens_pos = 0;
 	int dir = move_params->dir;
 	int32_t num_steps = move_params->num_steps;
+	struct damping_params_t ringing_params_kernel;
+
+	if (copy_from_user(&ringing_params_kernel,
+		&(move_params->ringing_params[a_ctrl->curr_region_index]),
+		sizeof(struct damping_params_t))) {
+			pr_err("copy_from_user failed\n");
+			return -EFAULT;
+	}
 
 	CDBG("%s called, dir %d, num_steps %d\n",
 		__func__,
@@ -254,7 +271,30 @@ static int32_t msm_actuator_move_focus(
 
 	if (dest_step_pos == a_ctrl->curr_step_pos)
 		return rc;
+#if 0
+	if ((sign_dir > MSM_ACTUATOR_MOVE_SIGNED_NEAR) ||
+		(sign_dir < MSM_ACTUATOR_MOVE_SIGNED_FAR)) {
+		pr_err("%s:%d Invalid sign_dir = %d\n",
+		__func__, __LINE__, sign_dir);
+		return -EFAULT;
+	}
+#endif
 
+	if ((dir > MOVE_FAR) || (dir < MOVE_NEAR)) {
+		pr_err("%s:%d Invalid direction = %d\n",
+		 __func__, __LINE__, dir);
+		return -EFAULT;
+	}
+	if (dest_step_pos > a_ctrl->total_steps) {
+		pr_err("Step pos greater than total steps = %d\n",
+		dest_step_pos);
+		return -EFAULT;
+	}
+	if (a_ctrl->curr_step_pos > a_ctrl->total_steps) {
+		pr_err("Step pos greater than total steps = %d\n",
+		a_ctrl->curr_step_pos);
+		return -EFAULT;
+	}
 	curr_lens_pos = a_ctrl->step_position_table[a_ctrl->curr_step_pos];
 	a_ctrl->i2c_tbl_index = 0;
 	CDBG("curr_step_pos =%d dest_step_pos =%d curr_lens_pos=%d\n",
@@ -270,18 +310,11 @@ static int32_t msm_actuator_move_focus(
 			target_step_pos = dest_step_pos;
 			target_lens_pos =
 				a_ctrl->step_position_table[target_step_pos];
-
-			CDBG("%s: [shchang : ACT] target_lens_pos = %d, sign_dir = %d..\n",
-				__func__, target_lens_pos, sign_dir);
-			/*shcahng@qaulcomm.com: 1022*/
-
 			rc = a_ctrl->func_tbl->
 				actuator_write_focus(
 					a_ctrl,
 					curr_lens_pos,
-					&(move_params->
-						ringing_params[a_ctrl->
-						curr_region_index]),
+					&ringing_params_kernel,
 					sign_dir,
 					target_lens_pos);
 			if (rc < 0) {
@@ -299,9 +332,7 @@ static int32_t msm_actuator_move_focus(
 				actuator_write_focus(
 					a_ctrl,
 					curr_lens_pos,
-					&(move_params->
-						ringing_params[a_ctrl->
-						curr_region_index]),
+					&ringing_params_kernel,
 					sign_dir,
 					target_lens_pos);
 			if (rc < 0) {
@@ -333,7 +364,7 @@ extern uint16_t start_dac; /*Pull Pan focus value from FROM*/
 static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 	struct msm_actuator_set_info_t *set_info)
 {
-#if 1 /*New Kernel*/
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR) /*New Kernel*/
   uint16_t i;
   uint16_t code_per_step;
   int16_t start_p, position_pan, num_steps, inf_offset, step_size;
@@ -392,6 +423,15 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 
 	kfree(a_ctrl->step_position_table);
 	a_ctrl->step_position_table = NULL;
+
+#if 0
+	if (set_info->af_tuning_params.total_steps
+		>  MAX_ACTUATOR_AF_TOTAL_STEPS) {
+		pr_err("%s: Max actuator totalsteps exceeded = %d\n",
+		__func__, set_info->af_tuning_params.total_steps);
+		return -EFAULT;
+	}
+#endif
 
 	/* Fill step position table */
 	a_ctrl->step_position_table =
@@ -456,6 +496,7 @@ static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl)
 			gpio_free(a_ctrl->vcm_pwd);
 	}
 
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	CDBG("%s Exit:%d, Addr:0x%x\n",
 		__func__, rc, a_ctrl->i2c_client.client->addr);
 
@@ -464,6 +505,7 @@ static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl)
 	if (rc < 0)
 		return rc;
 	usleep_range(1000, 2000);
+#endif
 
 	kfree(a_ctrl->step_position_table);
 	a_ctrl->step_position_table = NULL;
@@ -492,9 +534,18 @@ static int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 		pr_err("%s: Actuator function table not found\n", __func__);
 		return rc;
 	}
-
-	a_ctrl->region_size = set_info->af_tuning_params.region_size;
-	if (a_ctrl->region_size > MAX_ACTUATOR_REGION) {
+#if 0
+	if (set_info->af_tuning_params.total_steps
+		>  MAX_ACTUATOR_AF_TOTAL_STEPS) {
+		pr_err("%s: Max actuator totalsteps exceeded = %d\n",
+		__func__, set_info->af_tuning_params.total_steps);
+		return -EFAULT;
+	}
+#endif
+	if (set_info->af_tuning_params.region_size <= MAX_ACTUATOR_REGION) {
+		a_ctrl->region_size = set_info->af_tuning_params.region_size;
+	} else {
+		a_ctrl->region_size = 0;
 		pr_err("%s: MAX_ACTUATOR_REGION is exceeded.\n", __func__);
 		return -EFAULT;
 	}
@@ -509,8 +560,11 @@ static int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 	a_ctrl->i2c_data_type = set_info->actuator_params.i2c_data_type;
 	a_ctrl->i2c_client.client->addr = set_info->actuator_params.i2c_addr;
 	a_ctrl->i2c_client.addr_type = set_info->actuator_params.i2c_addr_type;
-	a_ctrl->reg_tbl_size = set_info->actuator_params.reg_tbl_size;
-	if (a_ctrl->reg_tbl_size > MAX_ACTUATOR_REG_TBL_SIZE) {
+	if (set_info->actuator_params.reg_tbl_size <=
+		MAX_ACTUATOR_REG_TBL_SIZE) {
+		a_ctrl->reg_tbl_size = set_info->actuator_params.reg_tbl_size;
+	} else {
+		a_ctrl->reg_tbl_size = 0;
 		pr_err("%s: MAX_ACTUATOR_REG_TBL_SIZE is exceeded.\n",
 			__func__);
 		return -EFAULT;
@@ -532,7 +586,9 @@ static int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 		return -EFAULT;
 	}
 
-	if (set_info->actuator_params.init_setting_size) {
+	if (set_info->actuator_params.init_setting_size &&
+		set_info->actuator_params.init_setting_size
+		<= MAX_ACTUATOR_REG_TBL_SIZE) {
 		if (a_ctrl->func_tbl->actuator_init_focus) {
 			init_settings = kmalloc(sizeof(struct reg_settings_t) *
 				(set_info->actuator_params.init_setting_size),
@@ -591,30 +647,32 @@ static int32_t msm_actuator_config(struct msm_actuator_ctrl_t *a_ctrl,
 	mutex_lock(a_ctrl->actuator_mutex);
 	CDBG("%s called, type %d\n", __func__, cdata.cfgtype);
 	switch (cdata.cfgtype) {
-		case CFG_SET_ACTUATOR_INFO:
-			rc = msm_actuator_init(a_ctrl, &cdata.cfg.set_info);
-			if (rc < 0)
-				pr_err("%s init table failed %d\n", __func__, rc);
-			break;
+	case CFG_SET_ACTUATOR_INFO:
+		rc = msm_actuator_init(a_ctrl, &cdata.cfg.set_info);
+		if (rc < 0)
+			pr_err("%s init table failed %d\n", __func__, rc);
+		break;
 
-		case CFG_SET_DEFAULT_FOCUS:
-			rc = a_ctrl->func_tbl->actuator_set_default_focus(a_ctrl,
-					&cdata.cfg.move);
-			if (rc < 0)
-				pr_err("%s move focus failed %d\n", __func__, rc);
-			break;
+	case CFG_SET_DEFAULT_FOCUS:
+		rc = a_ctrl->func_tbl->actuator_set_default_focus(a_ctrl,
+			&cdata.cfg.move);
+		if (rc < 0)
+			pr_err("%s move focus failed %d\n", __func__, rc);
+		break;
 
-		case CFG_MOVE_FOCUS:
-			rc = a_ctrl->func_tbl->actuator_move_focus(a_ctrl,
-					&cdata.cfg.move);
-			if (rc < 0)
-				pr_err("%s move focus failed %d\n", __func__, rc);
-			break;
+	case CFG_MOVE_FOCUS:
+		rc = a_ctrl->func_tbl->actuator_move_focus(a_ctrl,
+			&cdata.cfg.move);
+		if (rc < 0)
+			pr_err("%s move focus failed %d\n", __func__, rc);
+		break;
 
-		case CFG_FINAL_AF:   /*SEMCO request by Lizk 05112013*/	
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
+		case CFG_FINAL_AF:   /*SEMCO request by Lizk 05112013*/
 			is_af_final = true;
 			pr_err("%s evan : kernel side - is_af_final= %d\n", __func__, is_af_final);
 			break;
+#endif
 
 		default:
 			break;
@@ -633,7 +691,7 @@ static int32_t msm_actuator_i2c_probe(
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		pr_err("i2c_check_functionality failed\n");
-		rc = -ENXIO;/*-ENOTSUPP?*/
+		rc = -EFAULT;
 		goto probe_failure;
 	}
 
@@ -774,6 +832,7 @@ static struct msm_actuator msm_piezo_actuator_table = {
 	},
 };
 
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 static struct msm_actuator hvca_actuator_table = {
 	.act_type = ACTUATOR_HVCA,
 	.func_tbl = {
@@ -785,6 +844,7 @@ static struct msm_actuator hvca_actuator_table = {
 		.actuator_parse_i2c_params = NULL,
 	},
 };
+#endif
 subsys_initcall(msm_actuator_i2c_add_driver);
 MODULE_DESCRIPTION("MSM ACTUATOR");
 MODULE_LICENSE("GPL v2");

@@ -71,7 +71,7 @@ int msm_mctl_check_pp(struct msm_cam_media_controller *p_mctl,
 	int image_mode, int *pp_divert_type, int *pp_type)
 {
 	int rc = 0;
-	unsigned long flags = 0;
+	unsigned long flags;
 	uint32_t pp_key = 0;
 
 	*pp_type = 0;
@@ -272,7 +272,16 @@ int msm_mctl_do_pp_divert(
 		p_mctl->pp_info.cur_frame_id[pcam_inst->image_mode];
 	div.frame.buf_idx  = buf_idx;
 	div.frame.handle = (uint32_t)vb;
-	msm_mctl_gettimeofday(&div.frame.timestamp);
+
+        /*Extract AVTimer TimeStamps if enabled*/
+	if(pcam_inst->avtimerOn){
+	    msm_mctl_getAVTimer(pcam_inst,&div.frame.timestamp);
+	    D("%s: Timestamp from AVTimer %ld.%ld", __func__,
+             div.frame.timestamp.tv_sec, div.frame.timestamp.tv_usec);
+	} else {
+	    msm_mctl_gettimeofday(&div.frame.timestamp);
+	}
+
 	vb->vidbuf.v4l2_buf.timestamp = div.frame.timestamp;
 	div.do_pp = pp_type;
 	D("%s Diverting frame %x id %d to userspace ", __func__,
@@ -428,7 +437,7 @@ int msm_mctl_pp_proc_cmd(struct msm_cam_media_controller *p_mctl,
 			struct msm_mctl_pp_cmd *pp_cmd)
 {
 	int rc = 0;
-	unsigned long flags = 0;
+	unsigned long flags;
 
 	switch (pp_cmd->id) {
 	case MCTL_CMD_DIVERT_FRAME_PP_PATH: {

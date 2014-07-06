@@ -403,7 +403,6 @@ void msm_gemini_hw_write(struct msm_gemini_hw_cmd *hw_cmd_p)
 	writel(new_data, paddr);
 }
 
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 void msm_gemini_io_w(uint32_t offset, uint32_t val)
 {
 	uint32_t *paddr = gemini_region_base + offset;
@@ -415,7 +414,6 @@ uint32_t msm_gemini_io_r(uint32_t offset)
 	uint32_t *paddr = gemini_region_base + offset;
 	return readl(paddr);
 }
-#endif
 
 int msm_gemini_hw_wait(struct msm_gemini_hw_cmd *hw_cmd_p, int m_us)
 {
@@ -446,7 +444,7 @@ void msm_gemini_hw_delay(struct msm_gemini_hw_cmd *hw_cmd_p, int m_us)
 	}
 }
 
-int msm_gemini_hw_exec_cmds(struct msm_gemini_hw_cmd *hw_cmd_p, int m_cmds)
+int msm_gemini_hw_exec_cmds(struct msm_gemini_hw_cmd *hw_cmd_p, uint32_t m_cmds)
 {
 	int is_copy_to_user = -1;
 	uint32_t data;
@@ -501,14 +499,21 @@ int msm_gemini_hw_exec_cmds(struct msm_gemini_hw_cmd *hw_cmd_p, int m_cmds)
 	return is_copy_to_user;
 }
 
-void msm_gemini_hw_region_dump(int size)
+void msm_gemini_hw_region_dump(uint32_t size)
 {
 	uint32_t *p;
 	uint8_t *p8;
 
-	if (size > gemini_region_size)
+	if (size > gemini_region_size) {
 		GMN_PR_ERR("%s:%d] wrong region dump size\n",
 			__func__, __LINE__);
+		return;
+	}
+	if (!gemini_region_base) {
+		GMN_PR_ERR("%s:%d] gemini region not setup yet\n",
+			__func__, __LINE__);
+		return;
+	}
 
 	p = (uint32_t *) gemini_region_base;
 	while (size >= 16) {

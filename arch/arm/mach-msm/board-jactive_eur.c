@@ -1140,6 +1140,36 @@ static struct i2c_board_info touchkey_i2c_devices_info[] __initdata = {
 	},
 };
 
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+static struct i2c_gpio_platform_data  cypress_touchkey_i2c_gpio_data = {
+	.sda_pin		= GPIO_TOUCHKEY_SDA,	
+	.scl_pin		= GPIO_TOUCHKEY_SCL,
+	.udelay			= 0,
+	.sda_is_open_drain	= 0,
+	.scl_is_open_drain	= 0,
+	.scl_is_output_only	= 0,
+};
+static struct platform_device touchkey_i2c_gpio_device = {
+	.name			= "i2c-gpio",
+	.id			= MSM_TOUCHKEY_I2C_BUS_ID,
+	.dev.platform_data	= &cypress_touchkey_i2c_gpio_data,
+};
+
+static struct i2c_gpio_platform_data  cypress_touchkey_i2c_gpio_data_2 = {
+	.sda_pin		= GPIO_TOUCHKEY_SDA,	
+	.scl_pin		= GPIO_TOUCHKEY_SCL_2,
+	.udelay			= 0,
+	.sda_is_open_drain	= 0,
+	.scl_is_open_drain	= 0,
+	.scl_is_output_only	= 0,
+};
+static struct platform_device touchkey_i2c_gpio_device_2 = {
+	.name			= "i2c-gpio",
+	.id			= MSM_TOUCHKEY_I2C_BUS_ID,
+	.dev.platform_data	= &cypress_touchkey_i2c_gpio_data_2,
+};
+#endif
+
 #endif
 
 static char prim_panel_name[PANEL_NAME_MAX_LEN];
@@ -1853,7 +1883,7 @@ struct pm8xxx_mpp_config_data mpp4_cfg = {
 };
 
 #define MPP_MCU_NRST PM8921_MPP_PM_TO_SYS(4)
-
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 static void clear_ssp_gpio(void)
 {
 	struct pm_gpio ap_mcu_int_cfg = {
@@ -1895,6 +1925,7 @@ static void clear_ssp_gpio(void)
 	mdelay(1);
 	pr_info("[SSP] %s done\n", __func__);
 }
+#endif
 
 static int initialize_ssp_gpio(void)
 {
@@ -1927,7 +1958,9 @@ static int initialize_ssp_gpio(void)
 		.vin_sel = 2,
 		.function = PM_GPIO_FUNC_NORMAL,
 		.inv_int_pol = 0,
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		.out_strength = PM_GPIO_STRENGTH_HIGH,
+#endif
 	};
 
 	pr_info("[SSP]%s\n", __func__);
@@ -2055,6 +2088,7 @@ static void bcm2079x_sw_i2c_config(void)
 		GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
 }
 #endif
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 #define GPIO_NFC_FIRMWARE_REV2	PM8921_GPIO_PM_TO_SYS(12)
 static int __init bcm2079x_init(void)
 {
@@ -2085,6 +2119,34 @@ static int __init bcm2079x_init(void)
 		pm8xxx_gpio_config(GPIO_NFC_FIRMWARE_REV2, &nfc_firmware_cfg);
 	else
 		pm8xxx_gpio_config(GPIO_NFC_FIRMWARE, &nfc_firmware_cfg);
+#else
+static int __init bcm2079x_init(void)
+{
+	struct pm_gpio nfc_irq_cfg = {
+		.direction = PM_GPIO_DIR_IN,
+		.pull = PM_GPIO_PULL_NO,
+		.vin_sel = 2,
+		.function = PM_GPIO_FUNC_NORMAL,
+		.inv_int_pol = 0,
+	};
+	struct pm_gpio nfc_en_cfg = {
+		.direction = PM_GPIO_DIR_OUT,
+		.pull = PM_GPIO_PULL_UP_31P5,
+		.vin_sel = 2,
+		.function = PM_GPIO_FUNC_NORMAL,
+		.inv_int_pol = 0,
+	};
+	struct pm_gpio nfc_firmware_cfg = {
+		.direction = PM_GPIO_DIR_OUT,
+		.pull = PM_GPIO_PULL_UP_31P5,
+		.vin_sel = 2,
+		.function = PM_GPIO_FUNC_NORMAL,
+		.inv_int_pol = 0,
+	};
+	pm8xxx_gpio_config(GPIO_NFC_IRQ, &nfc_irq_cfg);
+	pm8xxx_gpio_config(GPIO_NFC_EN, &nfc_en_cfg);
+	pm8xxx_gpio_config(GPIO_NFC_FIRMWARE, &nfc_firmware_cfg);
+#endif
 #ifdef NFC_SW_I2C
 	bcm2079x_sw_i2c_config();
 #endif
@@ -2109,7 +2171,11 @@ static struct platform_device bcm2079x_i2c_gpio_device = {
 static struct bcm2079x_platform_data bcm2079x_i2c_pdata = {
 	.irq_gpio = GPIO_NFC_IRQ,
 	.en_gpio = GPIO_NFC_EN,
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	.wake_gpio = GPIO_NFC_FIRMWARE_REV2,
+#else
+    .wake_gpio = GPIO_NFC_FIRMWARE,
+#endif
 };
 
 static struct i2c_board_info nfc_bcm2079x_info[] __initdata = {
@@ -3070,7 +3136,7 @@ static struct platform_device msm8064_device_saw_regulator_core3 = {
 
 	},
 };
-
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 #ifdef CONFIG_CAMERA_SW_I2C_ACT
 static struct i2c_gpio_platform_data hvca_i2c_gpio_data = {
 	.sda_pin = 71,
@@ -3094,6 +3160,7 @@ static struct spi_board_info eeprom_spi_info[] __initdata = {
         .mode                   = SPI_MODE_0,
     },
 };
+#endif
 static struct msm_rpmrs_level msm_rpmrs_levels[] = {
 	{
 		MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT,
@@ -3193,7 +3260,7 @@ static uint8_t spm_power_collapse_without_rpm[] __initdata = {
 	0x10, 0x54, 0x30, 0x0C,
 	0x24, 0x30, 0x0f,
 };
-
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 static uint8_t spm_retention_cmd_sequence[] __initdata = {
 	0x00, 0x05, 0x03, 0x0D,
 	0x0B, 0x00, 0x0f,
@@ -3205,6 +3272,7 @@ static uint8_t spm_retention_with_krait_v3_cmd_sequence[] __initdata = {
   0x00, 0x42, 0x1B,
   0x0f,
 };
+#endif
 
 static uint8_t spm_power_collapse_with_rpm[] __initdata = {
 	0x00, 0x24, 0x54, 0x10,
@@ -3220,22 +3288,27 @@ static struct msm_spm_seq_entry msm_spm_seq_list[] __initdata = {
 		.cmd = spm_wfi_cmd_sequence,
 	},
 	[1] = {
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		.mode = MSM_SPM_MODE_POWER_RETENTION,
 		.notify_rpm = false,
 		.cmd = spm_retention_cmd_sequence,
 	},
 	[2] = {
+#endif
 		.mode = MSM_SPM_MODE_POWER_COLLAPSE,
 		.notify_rpm = false,
 		.cmd = spm_power_collapse_without_rpm,
 	},
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	[3] = {
+#else
+	[2] = {
+#endif
 		.mode = MSM_SPM_MODE_POWER_COLLAPSE,
 		.notify_rpm = true,
 		.cmd = spm_power_collapse_with_rpm,
 	},
 };
-
 
 static uint8_t l2_spm_wfi_cmd_sequence[] __initdata = {
 	0x00, 0x20, 0x03, 0x20,
@@ -3295,9 +3368,15 @@ static struct msm_spm_platform_data msm_spm_data[] __initdata = {
 		.reg_init_values[MSM_SPM_REG_SAW2_AVS_HYSTERESIS] = 0x00,
 #endif
 		.reg_init_values[MSM_SPM_REG_SAW2_SPM_CTL] = 0x01,
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DLY] = 0x03020004,
 		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_0] = 0x0084009C,
 		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_1] = 0x00A4001C,
+#else
+		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DLY] = 0x02020204,
+		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_0] = 0x0060009C,
+		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_1] = 0x0000001C,
+#endif
 		.vctl_timeout_us = 50,
 		.num_modes = ARRAY_SIZE(msm_spm_seq_list),
 		.modes = msm_spm_seq_list,
@@ -3310,9 +3389,15 @@ static struct msm_spm_platform_data msm_spm_data[] __initdata = {
 		.reg_init_values[MSM_SPM_REG_SAW2_AVS_HYSTERESIS] = 0x00,
 #endif
 		.reg_init_values[MSM_SPM_REG_SAW2_SPM_CTL] = 0x01,
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DLY] = 0x03020004,
 		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_0] = 0x0084009C,
 		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_1] = 0x00A4001C,
+#else
+		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DLY] = 0x02020204,
+		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_0] = 0x0060009C,
+		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_1] = 0x0000001C,
+#endif
 		.vctl_timeout_us = 50,
 		.num_modes = ARRAY_SIZE(msm_spm_seq_list),
 		.modes = msm_spm_seq_list,
@@ -3325,9 +3410,15 @@ static struct msm_spm_platform_data msm_spm_data[] __initdata = {
 		.reg_init_values[MSM_SPM_REG_SAW2_AVS_HYSTERESIS] = 0x00,
 #endif
 		.reg_init_values[MSM_SPM_REG_SAW2_SPM_CTL] = 0x01,
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DLY] = 0x03020004,
 		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_0] = 0x0084009C,
 		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_1] = 0x00A4001C,
+#else
+		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DLY] = 0x02020204,
+		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_0] = 0x0060009C,
+		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_1] = 0x0000001C,
+#endif
 		.vctl_timeout_us = 50,
 		.num_modes = ARRAY_SIZE(msm_spm_seq_list),
 		.modes = msm_spm_seq_list,
@@ -3340,9 +3431,15 @@ static struct msm_spm_platform_data msm_spm_data[] __initdata = {
 		.reg_init_values[MSM_SPM_REG_SAW2_AVS_HYSTERESIS] = 0x00,
 #endif
 		.reg_init_values[MSM_SPM_REG_SAW2_SPM_CTL] = 0x01,
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DLY] = 0x03020004,
 		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_0] = 0x0084009C,
 		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_1] = 0x00A4001C,
+#else
+		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DLY] = 0x02020204,
+		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_0] = 0x0060009C,
+		.reg_init_values[MSM_SPM_REG_SAW2_PMIC_DATA_1] = 0x0000001C,
+#endif
 		.vctl_timeout_us = 50,
 		.num_modes = ARRAY_SIZE(msm_spm_seq_list),
 		.modes = msm_spm_seq_list,
@@ -3699,7 +3796,9 @@ static struct platform_device *common_not_mpq_devices[] __initdata = {
 static struct platform_device *early_common_devices[] __initdata = {
 	&apq8064_device_acpuclk,
 	&apq8064_device_dmov,
-	//&apq8064_device_qup_spi_gsbi5,
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+	&apq8064_device_qup_spi_gsbi5,
+#endif
 };
 
 static struct platform_device *pm8921_common_devices[] __initdata = {
@@ -3729,9 +3828,11 @@ static struct platform_device *common_devices[] __initdata = {
 	&apq8064_device_hsusb_host,
 	&android_usb_device,
 	&msm_device_wcnss_wlan,
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	&apq8064_device_qup_spi_gsbi5, // Fortius AF
 #if 0 
     &msm8930_device_qup_spi_gsbi1,
+#endif
 #endif
 	&msm_device_iris_fm,
 	&apq8064_fmem_device,
@@ -3885,8 +3986,10 @@ static struct platform_device *cdp_devices[] __initdata = {
 #ifdef CONFIG_MSM_ROTATOR
 	&msm_rotator_device,
 #endif
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	&msm8064_pc_cntr,
 	&msm8064_cpu_slp_status,
+#endif
 	&sec_device_jack,
 #ifdef CONFIG_SENSORS_SSP_C12SD
 	&uv_device,
@@ -4031,9 +4134,10 @@ static struct spi_board_info spi_board_info[] __initdata = {
 static int  es325_enable_VDD_CORE(void)
 {
 	static struct regulator *l18;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	static struct regulator *l27;
 	int ret;
-	
+
 	if (system_rev <= 13 ) {
 		l18 = regulator_get(NULL, "8921_l18");
 		if (IS_ERR(l18)) {
@@ -4065,6 +4169,24 @@ static int  es325_enable_VDD_CORE(void)
 		}
 	}
 	return 0;
+#else
+	int ret;
+
+	l18 = regulator_get(NULL, "8921_l18");
+	if (IS_ERR(l18)) {
+		pr_err("%s: error regulator_get\n", __func__);
+		return -1;
+	}
+	ret = regulator_set_voltage(l18, 1100000, 1100000);
+	if (ret)
+		pr_err("%s: error set voltage ret=%d\n", __func__, ret);
+	ret = regulator_enable(l18);
+	if (ret) {
+		pr_err("%s: error enable l18 ret=%d\n", __func__, ret);
+		return -1;
+	}
+	return 0;
+#endif
 }
 
 static void es325_2MIC_RST_init(void)
@@ -4290,6 +4412,17 @@ static struct gpio_keys_button gpio_keys_button[] = {
 		.wakeup		= 1,
 		.debounce_interval = 5,
 	},
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+	{
+		.code           = KEY_HOMEPAGE,
+		.gpio           = GPIO_KEY_HOME,
+		.desc           = "home_key",
+		.active_low     = 1,
+		.type		= EV_KEY,
+		.wakeup		= 1,
+		.debounce_interval = 5,
+	},
+#endif
 	{
 		.code           = KEY_MENU,
 		.gpio           = GPIO_KEY_MENU,
@@ -4308,6 +4441,7 @@ static struct gpio_keys_button gpio_keys_button[] = {
 		.wakeup		= 0,
 		.debounce_interval = 5,
 	},
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	{
 		.code           = KEY_HOMEPAGE,
 		.gpio           = GPIO_KEY_HOME,
@@ -4317,6 +4451,7 @@ static struct gpio_keys_button gpio_keys_button[] = {
 		.wakeup		= 1,
 		.debounce_interval = 5,
 	},
+#endif
 };
 
 static struct gpio_keys_platform_data gpio_keys_data = {
@@ -5001,7 +5136,7 @@ static void vps_sound_init(void)
 			&vps_sound_en);
 
 }
-
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 static void __init apq8064ab_update_retention_spm(void)
 {
   int i;
@@ -5018,7 +5153,7 @@ static void __init apq8064ab_update_retention_spm(void)
     }
   }
 }
-
+#endif
 static void __init apq8064_common_init(void)
 {
 	u32 platform_version;
@@ -5052,6 +5187,10 @@ static void __init apq8064_common_init(void)
 	apq8064_i2c_init();
 	register_i2c_devices();
 
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+	apq8064_device_qup_spi_gsbi5.dev.platform_data =
+						&apq8064_qup_spi_gsbi5_pdata;
+#endif
 	apq8064_init_pmic();
 	if (machine_is_apq8064_liquid())
 		msm_otg_pdata.mhl_enable = true;
@@ -5076,7 +5215,14 @@ static void __init apq8064_common_init(void)
 			machine_is_mpq8064_dtv()))
 		platform_add_devices(common_not_mpq_devices,
 			ARRAY_SIZE(common_not_mpq_devices));
-	
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_236
+	if (system_rev < 9)
+		platform_device_register(&touchkey_i2c_gpio_device);
+	else
+		platform_device_register(&touchkey_i2c_gpio_device_2);
+#endif
+#endif
 	enable_ddr3_regulator();
 	msm_hsic_pdata.swfi_latency =
 		msm_rpmrs_levels[0].latency_us;
@@ -5113,12 +5259,14 @@ static void __init apq8064_common_init(void)
 		apq8064_init_dsps();
 		platform_device_register(&msm_8960_riva);
 	}
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	if (cpu_is_krait_v3()) {
 		msm_pm_set_tz_retention_flag(0);
 		apq8064ab_update_retention_spm();
 	} else {
 		msm_pm_set_tz_retention_flag(1);
 	}
+#endif
 	msm_spm_init(msm_spm_data, ARRAY_SIZE(msm_spm_data));
 	msm_spm_l2_init(msm_spm_l2_data);
 	BUG_ON(msm_pm_boot_init(&msm_pm_boot_pdata));
@@ -5189,15 +5337,19 @@ static void __init apq8064_gpio_keys_init(void)
 	pm8xxx_gpio_config(GPIO_KEY_MENU, &param);
 	pm8xxx_gpio_config(GPIO_KEY_BACK, &param);
 }
-
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 static void __init nfc_gpio_rev_init(void)
 {
 	if (system_rev < BOARD_REV14)
 		bcm2079x_i2c_pdata.wake_gpio = GPIO_NFC_FIRMWARE;
 }
+#endif
+
 static void __init samsung_jf_init(void)
 {
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	int ret = -1;
+#endif
 #ifdef CONFIG_SEC_DEBUG
 	sec_debug_init();
 #endif
@@ -5227,7 +5379,7 @@ static void __init samsung_jf_init(void)
 						ARRAY_SIZE(spi_board_info));
 #endif
 	}
-#if 1
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	apq8064_device_qup_spi_gsbi5.dev.platform_data =
 						&apq8064_qup_spi_gsbi5_pdata;
     ret = spi_register_board_info(eeprom_spi_info,
@@ -5244,7 +5396,9 @@ static void __init samsung_jf_init(void)
 	msm8960_init_battery();
 #endif
 #ifdef CONFIG_SENSORS_SSP
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	clear_ssp_gpio();
+#endif
 	sensor_power_on_vdd(SNS_PWR_ON, SNS_PWR_ON);
 	initialize_ssp_gpio();
 #endif
@@ -5259,7 +5413,9 @@ static void __init samsung_jf_init(void)
 #endif
 #ifdef CONFIG_BCM2079X_NFC_I2C
 	bcm2079x_init();
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	nfc_gpio_rev_init();
+#endif
 #endif
 
 #ifndef CONFIG_MACH_JF

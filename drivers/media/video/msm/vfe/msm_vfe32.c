@@ -35,7 +35,9 @@
 atomic_t irq_cnt;
 extern unsigned int open_fail_flag;
 
-//#define FIXED_WM 1
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+#define FIXED_WM 1
+#endif
 
 #define VFE32_AXI_OFFSET 0x0050
 #define vfe32_get_ch_ping_addr(base, chn) \
@@ -239,11 +241,12 @@ static struct vfe32_cmd_type vfe32_cmd[] = {
 		{VFE_CMD_STATS_UNREGBUF},
 		{VFE_CMD_STATS_BG_START, V32_STATS_BG_LEN, V32_STATS_BG_OFF},
 		{VFE_CMD_STATS_BG_STOP},
-/*145*/	{VFE_CMD_STATS_BF_START, V32_STATS_BF_LEN, V32_STATS_BF_OFF},
-		{VFE_CMD_STATS_BF_STOP},
-/*147*/	{VFE_CMD_STATS_BHIST_START, V32_STATS_BHIST_LEN,
+		{VFE_CMD_STATS_BF_START, V32_STATS_BF_LEN, V32_STATS_BF_OFF},
+/*145*/ {VFE_CMD_STATS_BF_STOP},
+		{VFE_CMD_STATS_BHIST_START, V32_STATS_BHIST_LEN,
 			V32_STATS_BHIST_OFF},
 /*148*/	{VFE_CMD_STATS_BHIST_STOP},
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		{VFE_CMD_RESET_2},
 /*150*/	{VFE_CMD_FOV_ENC_CFG},
 		{VFE_CMD_FOV_VIEW_CFG},
@@ -263,6 +266,7 @@ static struct vfe32_cmd_type vfe32_cmd[] = {
 		{VFE_CMD_STOP_RECORDING_DONE},
 		{VFE_CMD_RGB_ALL_CFG},
 		{VFE_CMD_RGB_ALL_UPDATE},
+#endif
 };
 
 uint32_t vfe32_AXI_WM_CFG[] = {
@@ -389,7 +393,11 @@ static const char * const vfe32_general_cmd[] = {
 	"DEMOSAICV3_DBCC_UPDATE", /* 110 */
 	"DEMOSAICV3_DBPC_UPDATE",
 	"XBAR_CFG",
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	"MODULE_CFG",
+#else
+	"EZTUNE_CFG",
+#endif
 	"V32_ZSL",
 	"LINEARIZATION_UPDATE", /*115*/
 	"DEMOSAICV3_ABF_UPDATE",
@@ -405,6 +413,7 @@ static const char * const vfe32_general_cmd[] = {
 	"GET_RGB_G_TABLE",
 	"GET_LA_TABLE",
 	"DEMOSAICV3_UPDATE",
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	"VFE_CMD_ACTIVE_REGION_CFG",
 	"VFE_CMD_COLOR_PROCESSING_CONFIG", /*130*/
 	"VFE_CMD_STATS_WB_AEC_CONFIG",
@@ -415,6 +424,18 @@ static const char * const vfe32_general_cmd[] = {
 	"VFE_CMD_CAPTURE_RAW",
 	"VFE_CMD_STOP_LIVESHOT",
 	"VFE_CMD_RECONFIG_VFE",
+#else
+	"DUMMY_11",
+	"DUMMY_12", /*130*/
+	"DUMMY_13",
+	"DUMMY_14",
+	"DUMMY_15",
+	"DUMMY_16",
+	"DUMMY_17", /*135*/
+	"DUMMY_18",
+	"DUMMY_19",
+	"DUMMY_20",
+#endif
 	"STATS_REQBUF",
 	"STATS_ENQUEUEBUF", /*140*/
 	"STATS_FLUSH_BUFQ",
@@ -425,7 +446,8 @@ static const char * const vfe32_general_cmd[] = {
 	"STATS_BF_STOP",
 	"STATS_BHIST_START",
 	"STATS_BHIST_STOP",
-	"RDI_SEL" /*150*/
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
+	"RDI_SEL", /*150*/
 	"VFE_CMD_FOV_ENC_CFG",
 	"VFE_CMD_FOV_VIEW_CFG",
 	"VFE_CMD_FOV_ENC_UPDATE",
@@ -444,12 +466,13 @@ static const char * const vfe32_general_cmd[] = {
 	"VFE_CMD_STOP_RECORDING_DONE",
 	"VFE_CMD_RGB_ALL_CFG",
 	"VFE_CMD_RGB_ALL_UPDATE",
+#else
+	"RESET_2",
+#endif
 };
 
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
-static atomic_t recovery_active;
+static atomic_t recovery_active, fault_recovery;
 static uint32_t recover_irq_mask0, recover_irq_mask1;
-#endif
 
 uint8_t vfe32_use_bayer_stats(struct vfe32_ctrl_type *vfe32_ctrl)
 {
@@ -465,7 +488,9 @@ static void axi_enable_wm_irq(struct vfe_share_ctrl_t *share_ctrl)
 {
 	uint32_t irq_mask = 0, irq_comp_mask = 0;
 	uint16_t vfe_output_mode1 = 0;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	uint32_t rdi_comp_select = 0;
+#endif
 
 	uint16_t vfe_output_mode =
 		share_ctrl->outpath.output_mode &
@@ -535,9 +560,13 @@ static void axi_enable_wm_irq(struct vfe_share_ctrl_t *share_ctrl)
 		irq_mask |= (0x1 << (share_ctrl->outpath.out4.ch0 +
 			VFE_WM_OFFSET));
 	}
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	rdi_comp_select = (vfe_output_mode1 &&
 		(share_ctrl->rdi_comp == VFE_RDI_COMPOSITE));
 	if (rdi_comp_select) {
+#else
+	if (vfe_output_mode1) {
+#endif
 		irq_comp_mask |= (
 		0x1 << (share_ctrl->outpath.out2.ch0 + 16) |
 		0x1 << (share_ctrl->outpath.out3.ch0 + 16));
@@ -546,7 +575,11 @@ static void axi_enable_wm_irq(struct vfe_share_ctrl_t *share_ctrl)
 
 	msm_camera_io_w(irq_mask, share_ctrl->vfebase +
 			VFE_IRQ_MASK_0);
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	if (vfe_output_mode || rdi_comp_select)
+#else
+	if (vfe_output_mode || vfe_output_mode1)
+#endif
 		msm_camera_io_w(irq_comp_mask,
 			share_ctrl->vfebase + VFE_IRQ_COMP_MASK);
 }
@@ -556,7 +589,9 @@ static void axi_disable_wm_irq(struct vfe_share_ctrl_t *share_ctrl,
 {
 	uint32_t irq_mask, irq_comp_mask = 0;
 	uint16_t vfe_output_mode1 = 0;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	uint32_t rdi_comp_select = 0;
+#endif
 	uint16_t vfe_output_mode =
 		output_mode &
 			~(VFE32_OUTPUT_MODE_TERTIARY1|
@@ -616,9 +651,13 @@ static void axi_disable_wm_irq(struct vfe_share_ctrl_t *share_ctrl,
 		irq_mask &= ~(0x1 << (share_ctrl->outpath.out4.ch0 +
 			VFE_WM_OFFSET));
 	}
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	rdi_comp_select = (vfe_output_mode1 &&
 		(share_ctrl->rdi_comp == VFE_RDI_COMPOSITE));
 	if (rdi_comp_select) {
+#else
+	if (vfe_output_mode1) {
+#endif
 		irq_comp_mask &= ~(
 		0x1 << (share_ctrl->outpath.out2.ch0 + 16) |
 		0x1 << (share_ctrl->outpath.out3.ch0 + 16));
@@ -949,7 +988,7 @@ static void axi_reset_internal_variables(
 static void axi_global_reset_internal_variables(
 	struct axi_ctrl_t *axi_ctrl)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	/* state control variables */
 	axi_ctrl->share_ctrl->start_ack_pending = FALSE;
 	atomic_set(&irq_cnt, 0);
@@ -973,6 +1012,7 @@ static void axi_global_reset_internal_variables(
 	atomic_set(&axi_ctrl->share_ctrl->rdi0_update_ack_pending, 0);
 	atomic_set(&axi_ctrl->share_ctrl->rdi1_update_ack_pending, 0);
 	atomic_set(&axi_ctrl->share_ctrl->rdi2_update_ack_pending, 0);
+        atomic_set(&fault_recovery, 0);
 
 	/* 0 for continuous mode, 1 for snapshot mode */
 	axi_ctrl->share_ctrl->operation_mode = 0;
@@ -1153,7 +1193,7 @@ static void vfe32_set_default_reg_values(
 static void vfe32_reset_internal_variables(
 	struct vfe32_ctrl_type *vfe32_ctrl)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	spin_lock_irqsave(&vfe32_ctrl->share_ctrl->update_ack_lock,
 		flags);
 	vfe32_ctrl->share_ctrl->update_ack_pending = FALSE;
@@ -1202,9 +1242,7 @@ static void vfe32_reset_internal_variables(
 	vfe32_ctrl->frame_skip_cnt = 31;
 	vfe32_ctrl->frame_skip_pattern = 0xffffffff;
 	vfe32_ctrl->snapshot_frame_cnt = 0;
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	atomic_set(&recovery_active, 0);
-#endif
 	vfe32_set_default_reg_values(vfe32_ctrl);
 }
 
@@ -1389,7 +1427,7 @@ static int vfe_stats_awb_buf_init(
 	struct vfe_cmd_stats_buf *in)
 {
 	uint32_t addr;
-	unsigned long flags = 0;
+	unsigned long flags;
 
 	spin_lock_irqsave(&vfe32_ctrl->stats_bufq_lock, flags);
 	addr = (uint32_t)vfe32_stats_dqbuf(vfe32_ctrl, MSM_STATS_TYPE_AWB);
@@ -1419,7 +1457,7 @@ static uint32_t vfe_stats_aec_bg_buf_init(
 	struct vfe32_ctrl_type *vfe32_ctrl)
 {
 	uint32_t addr;
-	unsigned long flags = 0;
+	unsigned long flags;
 	uint32_t stats_type;
 
 	stats_type =
@@ -1454,7 +1492,7 @@ static int vfe_stats_af_bf_buf_init(
 	struct vfe32_ctrl_type *vfe32_ctrl)
 {
 	uint32_t addr;
-	unsigned long flags = 0;
+	unsigned long flags;
 	int rc = 0;
 
 	uint32_t stats_type;
@@ -1496,7 +1534,7 @@ static uint32_t vfe_stats_bhist_buf_init(
 	struct vfe32_ctrl_type *vfe32_ctrl)
 {
 	uint32_t addr;
-	unsigned long flags = 0;
+	unsigned long flags;
 
 	spin_lock_irqsave(&vfe32_ctrl->stats_bufq_lock, flags);
 	addr = (uint32_t)vfe32_stats_dqbuf(vfe32_ctrl, MSM_STATS_TYPE_BHIST);
@@ -1528,7 +1566,7 @@ static int vfe_stats_ihist_buf_init(
 	struct vfe32_ctrl_type *vfe32_ctrl)
 {
 	uint32_t addr;
-	unsigned long flags = 0;
+	unsigned long flags;
 
 	spin_lock_irqsave(&vfe32_ctrl->stats_bufq_lock, flags);
 	addr = (uint32_t)vfe32_stats_dqbuf(vfe32_ctrl, MSM_STATS_TYPE_IHIST);
@@ -1560,7 +1598,7 @@ static int vfe_stats_rs_buf_init(
 	struct vfe32_ctrl_type *vfe32_ctrl)
 {
 	uint32_t addr;
-	unsigned long flags = 0;
+	unsigned long flags;
 
 	spin_lock_irqsave(&vfe32_ctrl->stats_bufq_lock, flags);
 	addr = (uint32_t)vfe32_stats_dqbuf(vfe32_ctrl, MSM_STATS_TYPE_RS);
@@ -1589,7 +1627,7 @@ static int vfe_stats_cs_buf_init(
 	struct vfe32_ctrl_type *vfe32_ctrl)
 {
 	uint32_t addr;
-	unsigned long flags = 0;
+	unsigned long flags;
 	spin_lock_irqsave(&vfe32_ctrl->stats_bufq_lock, flags);
 	addr = (uint32_t)vfe32_stats_dqbuf(vfe32_ctrl, MSM_STATS_TYPE_CS);
 	spin_unlock_irqrestore(&vfe32_ctrl->stats_bufq_lock, flags);
@@ -1620,8 +1658,10 @@ static void vfe32_start_common(struct vfe32_ctrl_type *vfe32_ctrl)
 		vfe32_ctrl->share_ctrl->outpath.output_mode);
 		msm_camera_io_w_mb(1, vfe32_ctrl->share_ctrl->vfebase +
 			VFE_CAMIF_COMMAND);
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		msm_camera_io_w_mb(VFE_AXI_CFG_MASK,
 				vfe32_ctrl->share_ctrl->vfebase + VFE_AXI_CFG);
+#endif
 }
 
 static int vfe32_start_recording(
@@ -1643,13 +1683,13 @@ static int vfe32_stop_recording(
 		vfe32_ctrl->share_ctrl->vfebase + VFE_REG_UPDATE_CMD);
 	return 0;
 }
-
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 static void vfe32_stop_recording_done(struct msm_cam_media_controller *pmctl)
 {
 	msm_camio_bus_scale_cfg(pmctl->sdata->pdata->cam_bus_scale_table,
 							S_PREVIEW);
 }
-
+#endif
 static void vfe32_start_liveshot(
 	struct msm_cam_media_controller *pmctl,
 	struct vfe32_ctrl_type *vfe32_ctrl)
@@ -1735,8 +1775,11 @@ static int vfe32_start(
 
 static void vfe32_update(struct vfe32_ctrl_type *vfe32_ctrl)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	uint32_t value = 0;
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+	uint32_t old_val = 0;
+#endif
 	if (vfe32_ctrl->update_linear) {
 		if (!msm_camera_io_r(
 			vfe32_ctrl->share_ctrl->vfebase +
@@ -1779,6 +1822,17 @@ static void vfe32_update(struct vfe32_ctrl_type *vfe32_ctrl)
 			vfe32_ctrl->share_ctrl->vfebase + V32_RGB_G_OFF);
 		vfe32_ctrl->update_gamma = false;
 	}
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+	if (vfe32_ctrl->update_abcc) {
+		value = msm_camera_io_r(vfe32_ctrl->share_ctrl->vfebase + V32_DEMOSAICV3_0_OFF);
+		old_val = value & V33_ABCC_LUT_BANK_SEL_MASK;
+		value &= ~V33_ABCC_LUT_BANK_SEL_MASK;
+		value |= (old_val) ? 0x0 : 0x100;
+		CDBG("%s: ABCC update 0x%x 0x%x", __func__, value, old_val);
+		msm_camera_io_w(value, vfe32_ctrl->share_ctrl->vfebase + V32_DEMOSAICV3_0_OFF);
+		vfe32_ctrl->update_abcc = false;
+	}
+#endif
 
 	spin_lock_irqsave(&vfe32_ctrl->share_ctrl->update_ack_lock, flags);
 	vfe32_ctrl->share_ctrl->update_ack_pending = TRUE;
@@ -1973,7 +2027,9 @@ static int configure_pingpong_buffers(
 	struct vfe32_output_ch *outch = NULL;
 	int rc = 0;
 	uint32_t inst_handle = 0;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	uint32_t rdi_comp_select = 0;
+#endif
 	static uint32_t ping_t1_ch0_paddr, pong_t1_ch0_paddr;
 
 	if (path == VFE_MSG_OUTPUT_PRIMARY)
@@ -1988,27 +2044,40 @@ static int configure_pingpong_buffers(
 		inst_handle = axi_ctrl->share_ctrl->outpath.out4.inst_handle;
 
 	CDBG("%s path %d, inst_handle 0x%x\n", __func__, path, inst_handle);
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	if ((axi_ctrl->share_ctrl->rdi_comp == VFE_RDI_COMPOSITE) &&
 		path == VFE_MSG_OUTPUT_TERTIARY2) {
 		/* Do Nothing, since buf address will be
 			fetched in TERTIARY1 case */
 	} else {
+#else
+	if (path != VFE_MSG_OUTPUT_TERTIARY2) {
+#endif
 		vfe32_subdev_notify(id, path, inst_handle,
 			&axi_ctrl->subdev, axi_ctrl->share_ctrl);
 	}
 
 	outch = vfe32_get_ch(path, axi_ctrl->share_ctrl);
-
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	if ((axi_ctrl->share_ctrl->rdi_comp == VFE_RDI_COMPOSITE) &&
 		(path == VFE_MSG_OUTPUT_TERTIARY1)) {
+#else
+	if (path == VFE_MSG_OUTPUT_TERTIARY1) {
+#endif
 		ping_t1_ch0_paddr = outch->ping.ch_paddr[1];
 		pong_t1_ch0_paddr = outch->pong.ch_paddr[1];
 	}
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
+
 	rdi_comp_select =
 		(axi_ctrl->share_ctrl->rdi_comp  == VFE_RDI_COMPOSITE) &&
 		(path == VFE_MSG_OUTPUT_TERTIARY2) && ping_t1_ch0_paddr &&
 		pong_t1_ch0_paddr;
 	if (rdi_comp_select) {
+#else
+	if (path == VFE_MSG_OUTPUT_TERTIARY2 && ping_t1_ch0_paddr &&
+			pong_t1_ch0_paddr) {
+#endif
 		vfe32_put_ch_ping_addr(
 			axi_ctrl->share_ctrl->vfebase, outch->ch0,
 			ping_t1_ch0_paddr);
@@ -2108,6 +2177,9 @@ static int vfe32_proc_general(
 	uint32_t *cmdp_local = NULL;
 	uint32_t snapshot_cnt = 0;
 	uint32_t temp1 = 0, temp2 = 0;
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+	uint32_t abcc_update = 0;
+#endif
 	struct msm_camera_vfe_params_t vfe_params;
 
 	CDBG("vfe32_proc_general: cmdID = %s, length = %d\n",
@@ -2184,8 +2256,10 @@ static int vfe32_proc_general(
 			vfe32_general_cmd[cmd->id]);
 		rc = vfe32_stop_recording(pmctl, vfe32_ctrl);
 		break;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	case VFE_CMD_STOP_RECORDING_DONE:
 		vfe32_stop_recording_done(pmctl);
+#endif
 		break;
 	case VFE_CMD_OPERATION_CFG: {
 		if (cmd->length != V32_OPERATION_CFG_LEN) {
@@ -2899,10 +2973,70 @@ static int vfe32_proc_general(
 			vfe32_ctrl->share_ctrl->vfebase + V32_DEMOSAICV3_2_OFF,
 			cmdp_local, 2 * V32_DEMOSAICV3_0_LEN);
 		break;
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+	case VFE_CMD_DEMOSAICV3_ABCC_UPDATE:
+		abcc_update = TRUE;
+		/* fall through */
+	case VFE_CMD_DEMOSAICV3_ABCC_CFG: {
+		  enum VFE32_DMI_RAM_SEL dmi_sel = DEMOSAIC_LUT_RAM_BANK0;
 
+		  if (cmd->length != (V32_DEMOSAICV3_0_LEN +
+				 (V33_ABCC_LUT_TABLE_SIZE * sizeof(uint64_t)))) {
+				 CDBG("%s: invalid ABCC len %d", __func__,
+						cmd->length);
+				 rc = -EFAULT;
+				 goto proc_general_done;
+		  }
+
+		  cmdp = kmalloc(cmd->length, GFP_ATOMIC);
+		  if (!cmdp) {
+				 rc = -ENOMEM;
+				 goto proc_general_done;
+		  }
+		  if (copy_from_user(cmdp,
+				 (void __user *)(cmd->value) , cmd->length)) {
+				 rc = -EFAULT;
+				 goto proc_general_done;
+		  }
+
+		  cmdp_local = cmdp;
+		  new_val = *cmdp_local;
+
+		  old_val = msm_camera_io_r(vfe32_ctrl->share_ctrl->vfebase + V32_DEMOSAICV3_0_OFF);
+		  old_val &= ABCC_MASK;
+		  new_val = new_val | old_val;
+		  *cmdp_local = new_val;
+
+		  msm_camera_io_memcpy(vfe32_ctrl->share_ctrl->vfebase + V32_DEMOSAICV3_0_OFF,
+				 cmdp_local, V32_DEMOSAICV3_0_LEN);
+
+		  cmdp_local++;
+		  CDBG("%s: start ABCC table update %d cfg 0x%x 0x%x\n",
+				  __func__, abcc_update, old_val, new_val);
+		  if (abcc_update) {
+				 dmi_sel = (old_val & V33_ABCC_LUT_BANK_SEL_MASK) ?
+						DEMOSAIC_LUT_RAM_BANK0 :
+						DEMOSAIC_LUT_RAM_BANK1;
+		  }
+		  vfe32_program_dmi_cfg(dmi_sel, vfe32_ctrl);
+
+		  for (i = 0 ; i < V33_ABCC_LUT_TABLE_SIZE ; i++) {
+				 msm_camera_io_w(*(cmdp_local + 1),
+						vfe32_ctrl->share_ctrl->vfebase + VFE33_DMI_DATA_HI);
+				 msm_camera_io_w(*cmdp_local,
+						vfe32_ctrl->share_ctrl->vfebase + VFE33_DMI_DATA_LO);
+				 cmdp_local += 2;
+		  }
+		  vfe32_program_dmi_cfg(NO_MEM_SELECTED, vfe32_ctrl);
+		  vfe32_ctrl->update_abcc = abcc_update;
+		  CDBG("%s: end writing ABCC table\n", __func__);
+		break;
+	}
+#else
 	case VFE_CMD_DEMOSAICV3_ABCC_CFG:
 		rc = -EFAULT;
 		break;
+#endif
 
 	case VFE_CMD_DEMOSAICV3_ABF_UPDATE:/* 116 ABF update  */
 	case VFE_CMD_DEMOSAICV3_ABF_CFG: { /* 108 ABF config  */
@@ -3037,6 +3171,7 @@ static int vfe32_proc_general(
 	    cmdp -= 1;
 		break;
 
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	case VFE_CMD_RGB_ALL_CFG: {
 		cmdp = kmalloc((cmd->length), GFP_ATOMIC);
 		if (!cmdp) {
@@ -3097,6 +3232,7 @@ static int vfe32_proc_general(
 		vfe32_ctrl->update_gamma = TRUE;
 		cmdp -= 1;
 		break;
+#endif
 
 	case VFE_CMD_RGB_G_UPDATE: {
 		cmdp = kmalloc(cmd->length, GFP_ATOMIC);
@@ -3586,6 +3722,7 @@ static int vfe32_proc_general(
 		CDBG("%s Stopping liveshot ", __func__);
 		vfe32_stop_liveshot(pmctl, vfe32_ctrl);
 		break;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	case VFE_CMD_SELECT_RDI: {
 		uint32_t rdi_sel;
 		if (copy_from_user(&rdi_sel,
@@ -3614,6 +3751,7 @@ static int vfe32_proc_general(
 			vfe32_ctrl->ver_num.main);
 
 		break;
+#endif
 	default:
 		if (cmd->length != vfe32_cmd[cmd->id].length)
 			return -EINVAL;
@@ -3850,7 +3988,7 @@ void axi_stop_process(struct vfe_share_ctrl_t *share_ctrl)
 static void vfe32_process_reg_update_irq(
 		struct vfe32_ctrl_type *vfe32_ctrl)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	struct vfe_share_ctrl_t *share_ctrl = vfe32_ctrl->share_ctrl;
 	if (atomic_read(
 		&share_ctrl->pix0_update_ack_pending) == 2) {
@@ -3999,6 +4137,10 @@ static void vfe32_process_reg_update_irq(
 
 				share_ctrl->liveshot_state =
 					VFE_STATE_STARTED;
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+				msm_camera_io_w_mb(1, share_ctrl->vfebase +
+					VFE_REG_UPDATE_CMD);
+#endif
 			}
 			break;
 		case VFE_STATE_STARTED:
@@ -4012,18 +4154,14 @@ static void vfe32_process_reg_update_irq(
 				msm_camera_io_w(0, share_ctrl->vfebase +
 					vfe32_AXI_WM_CFG[
 					share_ctrl->outpath.out0.ch1]);
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 				share_ctrl->liveshot_state = VFE_STATE_HW_STOP_REQUESTED;
 				msm_camera_io_w_mb(1, share_ctrl->vfebase +
-						VFE_REG_UPDATE_CMD);
-#endif
+					VFE_REG_UPDATE_CMD);
 			}
 			break;
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		case VFE_STATE_HW_STOP_REQUESTED:
 			share_ctrl->liveshot_state = VFE_STATE_HW_STOPPED;
 			break;
-#endif
 		case VFE_STATE_STOP_REQUESTED:
 			if (share_ctrl->comp_output_mode &
 					VFE32_OUTPUT_MODE_PRIMARY) {
@@ -4223,7 +4361,7 @@ static void vfe32_process_rdi2_reg_update_irq(
 static void vfe32_process_reset_irq(
 		struct vfe32_ctrl_type *vfe32_ctrl)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 
 #if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	if (atomic_read(&recovery_active) == 1) {
@@ -4249,6 +4387,54 @@ static void vfe32_process_reset_irq(
 		msm_camera_io_w_mb(0x1, vfe32_ctrl->share_ctrl->vfebase + 0x1E0);
 		atomic_set(&recovery_active, 0);
 		printk("Recovery restart done\n");
+		return;
+	}
+#else
+	if (atomic_read(&recovery_active) == 1) {
+		pr_info("Recovery restart start\n");
+		if (atomic_read(&fault_recovery) == 1) {
+			atomic_set(&recovery_active, 0);
+			pr_err("potential page fault occured, stop recovery & send app notification");
+			v4l2_subdev_notify(&vfe32_ctrl->subdev, NOTIFY_VFE_CAMIF_ERROR,
+					(void *)NULL);
+			vfe32_send_isp_msg(&vfe32_ctrl->subdev,
+					vfe32_ctrl->share_ctrl->vfeFrameId, MSG_ID_CAMIF_ERROR);
+			return;
+		}
+
+		msm_camera_io_w(VFE_RELOAD_ALL_WRITE_MASTERS,
+			vfe32_ctrl->share_ctrl->vfebase + VFE_BUS_CMD);
+		msm_camera_io_w(recover_irq_mask0,
+			vfe32_ctrl->share_ctrl->vfebase + VFE_IRQ_MASK_0);
+		msm_camera_io_w(recover_irq_mask1,
+			vfe32_ctrl->share_ctrl->vfebase + VFE_IRQ_MASK_1);
+
+		if ((vfe32_ctrl->share_ctrl->liveshot_state ==
+				VFE_STATE_START_REQUESTED) ||
+			(vfe32_ctrl->share_ctrl->liveshot_state ==
+				VFE_STATE_STARTED) ||
+			(vfe32_ctrl->share_ctrl->liveshot_state ==
+				VFE_STATE_HW_STOP_REQUESTED)) {
+			pr_info("Liveshot recovery\n");
+			vfe32_ctrl->share_ctrl->outpath.out0.capture_cnt = 1;
+			vfe32_ctrl->share_ctrl->vfe_capture_count =
+			vfe32_ctrl->share_ctrl->outpath.out0.capture_cnt;
+			vfe32_ctrl->share_ctrl->liveshot_state =
+				VFE_STATE_START_REQUESTED;
+		}
+		msm_camera_io_w_mb(1,
+			vfe32_ctrl->share_ctrl->vfebase + VFE_REG_UPDATE_CMD);
+		pr_info("camif cfg: 0x%x\n",
+			msm_camera_io_r(
+			vfe32_ctrl->share_ctrl->vfebase + VFE_CAMIF_FRAME_CFG));
+		/* Clear CAMIF Status */
+		msm_camera_io_w_mb(0x4,
+			vfe32_ctrl->share_ctrl->vfebase + VFE_CAMIF_COMMAND);
+		/* Enable CAMIF capture */
+		msm_camera_io_w_mb(0x1,
+			vfe32_ctrl->share_ctrl->vfebase + VFE_CAMIF_COMMAND);
+		atomic_set(&recovery_active, 0);
+		pr_info("Recovery restart done\n");
 		return;
 	}
 #endif
@@ -4411,14 +4597,16 @@ static void vfe32_process_error_irq(
 
 	if (errStatus & VFE32_IMASK_STATS_SKIN_BHIST_BUS_OVFL)
 		pr_err("vfe32_irq: skin/bhist stats bus overflow\n");
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 
 	if (errStatus & VFE32_IMASK_BUS_OVFL_ERROR) {
 		pr_err("%s Bus Overflow. Notify error ", __func__);
 		/*
-		* Even though bus overflow is occurred, 
+		* Even though bus overflow is occurred,
 		* don't notify it because it will recover automatically.
 		*/
-	}	
+	}
+#endif
 }
 
 static void vfe32_process_common_error_irq(
@@ -4448,6 +4636,7 @@ static void vfe32_process_common_error_irq(
 
 	if (errStatus & VFE32_IMASK_AXI_ERROR)
 		pr_err("vfe32_irq: axi error\n");
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 
 	pr_err("axi vfe32_irq: errStatus(%d)\n", errStatus);
 
@@ -4456,7 +4645,8 @@ static void vfe32_process_common_error_irq(
 		(void *)NULL);
 	vfe32_send_isp_msg(&axi_ctrl->subdev,
 		axi_ctrl->share_ctrl->vfeFrameId, MSG_ID_CAMIF_ERROR);
-#endif	
+#endif
+#endif
 }
 
 
@@ -4486,6 +4676,12 @@ static void vfe_send_outmsg(
 		msg.frameCounter = axi_ctrl->share_ctrl->vfeFrameId;
 		break;
 	}
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+	if (axi_ctrl->simultaneous_sof_frame) {
+		msg.frameCounter--;
+		CDBG("SOF and Frame IRQs together, adjusting frame counter");
+	}
+#endif
 
 	v4l2_subdev_notify(&axi_ctrl->subdev,
 			NOTIFY_VFE_MSG_OUT,
@@ -4547,6 +4743,10 @@ static void vfe32_process_output_path_irq_0(
 			VFE_OUTPUTS_RAW ||
 		axi_ctrl->share_ctrl->liveshot_state ==
 			VFE_STATE_STARTED ||
+		axi_ctrl->share_ctrl->liveshot_state ==
+			VFE_STATE_HW_STOP_REQUESTED ||
+		axi_ctrl->share_ctrl->liveshot_state ==
+			VFE_STATE_HW_STOPPED ||
 		axi_ctrl->share_ctrl->liveshot_state ==
 			VFE_STATE_STOP_REQUESTED ||
 		axi_ctrl->share_ctrl->liveshot_state ==
@@ -5057,7 +5257,7 @@ static void vfe_send_comp_stats_msg(
 
 static void vfe32_process_stats_ae_bg_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	uint32_t addr;
 	uint32_t stats_type;
 	stats_type =
@@ -5082,7 +5282,7 @@ static void vfe32_process_stats_ae_bg_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 
 static void vfe32_process_stats_awb_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	uint32_t addr;
 	spin_lock_irqsave(&vfe32_ctrl->stats_bufq_lock, flags);
 	addr = (uint32_t)vfe32_stats_dqbuf(vfe32_ctrl, MSM_STATS_TYPE_AWB);
@@ -5103,7 +5303,7 @@ static void vfe32_process_stats_awb_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 
 static void vfe32_process_stats_af_bf_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	uint32_t addr;
 	uint32_t stats_type;
 	stats_type =
@@ -5128,7 +5328,7 @@ static void vfe32_process_stats_af_bf_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 
 static void vfe32_process_stats_bhist_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	uint32_t addr;
 	spin_lock_irqsave(&vfe32_ctrl->stats_bufq_lock, flags);
 	addr = (uint32_t)vfe32_stats_dqbuf(vfe32_ctrl, MSM_STATS_TYPE_BHIST);
@@ -5150,7 +5350,7 @@ static void vfe32_process_stats_bhist_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 
 static void vfe32_process_stats_ihist_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	uint32_t addr;
 	spin_lock_irqsave(&vfe32_ctrl->stats_bufq_lock, flags);
 	addr = (uint32_t)vfe32_stats_dqbuf(vfe32_ctrl, MSM_STATS_TYPE_IHIST);
@@ -5172,7 +5372,7 @@ static void vfe32_process_stats_ihist_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 
 static void vfe32_process_stats_rs_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	uint32_t addr;
 	spin_lock_irqsave(&vfe32_ctrl->stats_bufq_lock, flags);
 	addr = (uint32_t)vfe32_stats_dqbuf(vfe32_ctrl, MSM_STATS_TYPE_RS);
@@ -5193,7 +5393,7 @@ static void vfe32_process_stats_rs_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 
 static void vfe32_process_stats_cs_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	uint32_t addr;
 	spin_lock_irqsave(&vfe32_ctrl->stats_bufq_lock, flags);
 	addr = (uint32_t)vfe32_stats_dqbuf(vfe32_ctrl, MSM_STATS_TYPE_CS);
@@ -5216,7 +5416,7 @@ static void vfe32_process_stats_cs_irq(struct vfe32_ctrl_type *vfe32_ctrl)
 static void vfe32_process_stats(struct vfe32_ctrl_type *vfe32_ctrl,
 	uint32_t status_bits)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	int32_t process_stats = false;
 	uint32_t addr;
 	uint32_t stats_type;
@@ -5439,11 +5639,9 @@ static void vfe32_process_irq(
 
 static void axi32_do_tasklet(unsigned long data)
 {
-	unsigned long flags = 0;
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
+	unsigned long flags;
 	uint8_t  axi_busy_flag = true;
 	uint32_t halt_timeout = 100;
-#endif
 	struct axi_ctrl_t *axi_ctrl = (struct axi_ctrl_t *)data;
 	struct vfe32_ctrl_type *vfe32_ctrl = axi_ctrl->share_ctrl->vfe32_ctrl;
 	struct vfe32_isr_queue_cmd *qcmd = NULL;
@@ -5466,6 +5664,17 @@ static void axi32_do_tasklet(unsigned long data)
 		list_del(&qcmd->list);
 		spin_unlock_irqrestore(&axi_ctrl->tasklet_lock,
 			flags);
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+		/* Detect simultaneous SOF and output irqs to avoid
+		 * unexpected frame id sequences.*/
+		axi_ctrl->simultaneous_sof_frame =
+			(qcmd->vfeInterruptStatus0 &
+				VFE_IRQ_STATUS0_CAMIF_SOF_MASK)	&&
+			((qcmd->vfeInterruptStatus0 &
+				VFE_IRQ_STATUS0_IMAGE_COMPOSIT_DONE0_MASK) ||
+			(qcmd->vfeInterruptStatus0 &
+				VFE_IRQ_STATUS0_IMAGE_COMPOSIT_DONE1_MASK));
+#endif
 
 		if (axi_ctrl->share_ctrl->stats_comp) {
 			stat_interrupt = (qcmd->vfeInterruptStatus0 &
@@ -5486,78 +5695,100 @@ static void axi32_do_tasklet(unsigned long data)
 					VFE_IRQ_STATUS0_STATS_CS);
 		}
 
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+		if (atomic_read(&fault_recovery) && !atomic_read(&recovery_active)) {
+			pr_err("avert page fault when overflow recovery not in progress");
+			msm_camera_io_w_mb(AXI_HALT_CLEAR, axi_ctrl->share_ctrl->vfebase + VFE_AXI_CMD);
+			v4l2_subdev_notify(&vfe32_ctrl->subdev, NOTIFY_VFE_CAMIF_ERROR,
+					(void *)NULL);
+			vfe32_send_isp_msg(&vfe32_ctrl->subdev,
+					vfe32_ctrl->share_ctrl->vfeFrameId, MSG_ID_CAMIF_ERROR);
+		}
+#endif
+
 		if (!atomic_read(&recovery_active)) {
 			if (qcmd->vfeInterruptStatus0 &
-					VFE_IRQ_STATUS0_CAMIF_SOF_MASK) {
+				VFE_IRQ_STATUS0_CAMIF_SOF_MASK) {
 				if (stat_interrupt)
 					vfe32_ctrl->simultaneous_sof_stat = 1;
 				v4l2_subdev_notify(&vfe32_ctrl->subdev,
-						NOTIFY_VFE_IRQ,
-						(void *)VFE_IRQ_STATUS0_CAMIF_SOF_MASK);
+					NOTIFY_VFE_IRQ,
+					(void *)VFE_IRQ_STATUS0_CAMIF_SOF_MASK);
 			}
 
-			/* interrupt to be processed,  *qcmd has the payload.  */
+			/* interrupt to be processed,  *qcmd has the payload. */
 			if (qcmd->vfeInterruptStatus0 &
 					VFE_IRQ_STATUS0_REG_UPDATE_MASK)
 				v4l2_subdev_notify(&vfe32_ctrl->subdev,
-						NOTIFY_VFE_IRQ,
-						(void *)VFE_IRQ_STATUS0_REG_UPDATE_MASK);
+				NOTIFY_VFE_IRQ,
+				(void *)VFE_IRQ_STATUS0_REG_UPDATE_MASK);
 
 			if (qcmd->vfeInterruptStatus1 &
 					VFE_IRQ_STATUS1_RDI0_REG_UPDATE_MASK)
 				v4l2_subdev_notify(&vfe32_ctrl->subdev,
-						NOTIFY_VFE_IRQ,
-						(void *)VFE_IRQ_STATUS1_RDI0_REG_UPDATE);
+				NOTIFY_VFE_IRQ,
+				(void *)VFE_IRQ_STATUS1_RDI0_REG_UPDATE);
 
 			if (qcmd->vfeInterruptStatus1 &
 					VFE_IRQ_STATUS1_RDI1_REG_UPDATE_MASK)
 				v4l2_subdev_notify(&vfe32_ctrl->subdev,
-						NOTIFY_VFE_IRQ,
-						(void *)VFE_IRQ_STATUS1_RDI1_REG_UPDATE);
+				NOTIFY_VFE_IRQ,
+				(void *)VFE_IRQ_STATUS1_RDI1_REG_UPDATE);
 
 			if (qcmd->vfeInterruptStatus1 &
 					VFE_IRQ_STATUS1_RDI2_REG_UPDATE_MASK)
 				v4l2_subdev_notify(&vfe32_ctrl->subdev,
-						NOTIFY_VFE_IRQ,
-						(void *)VFE_IRQ_STATUS1_RDI2_REG_UPDATE);
+				NOTIFY_VFE_IRQ,
+				(void *)VFE_IRQ_STATUS1_RDI2_REG_UPDATE);
 		}
 
 		if ((qcmd->vfeInterruptStatus1 &
-					VFE_IMASK_WHILE_STOPPING_1) &&
-				atomic_read(&recovery_active) != 2)
+			VFE_IMASK_WHILE_STOPPING_1) &&
+			atomic_read(&recovery_active) != 2)
 			v4l2_subdev_notify(&vfe32_ctrl->subdev,
-					NOTIFY_VFE_IRQ,
-					(void *)VFE_IMASK_WHILE_STOPPING_1);
+				NOTIFY_VFE_IRQ,
+				(void *)VFE_IMASK_WHILE_STOPPING_1);
 
 		if (atomic_read(&axi_ctrl->share_ctrl->handle_common_irq)) {
 			if ((qcmd->vfeInterruptStatus1 &
-						VFE32_IMASK_COMMON_ERROR_ONLY_1) &&
-					atomic_read(&recovery_active) != 1) {
+				VFE32_IMASK_COMMON_ERROR_ONLY_1) &&
+				atomic_read(&recovery_active) != 1) {
 				pr_err("irq	errorIrq\n");
 				vfe32_process_common_error_irq(
-						axi_ctrl,
-						qcmd->vfeInterruptStatus1 &
-						VFE32_IMASK_COMMON_ERROR_ONLY_1);
+					axi_ctrl,
+					qcmd->vfeInterruptStatus1 &
+					VFE32_IMASK_COMMON_ERROR_ONLY_1);
 			}
 
-			if ((qcmd->vfeInterruptStatus1 & 0x3FFF00) && atomic_read(&recovery_active) == 2) {
+			if ((qcmd->vfeInterruptStatus1 & 0x3FFF00) &&
+					atomic_read(&recovery_active) == 2) {
 				while (axi_busy_flag && halt_timeout--) {
-					if (msm_camera_io_r(axi_ctrl->share_ctrl->vfebase + VFE_AXI_STATUS) & 0x1)
+					if (msm_camera_io_r(
+						axi_ctrl->share_ctrl->vfebase + 
+							VFE_AXI_STATUS) & 0x1)
 						axi_busy_flag = false;
 				}
-				msm_camera_io_w_mb(AXI_HALT_CLEAR, axi_ctrl->share_ctrl->vfebase + VFE_AXI_CMD);
+				msm_camera_io_w_mb(AXI_HALT_CLEAR,
+					axi_ctrl->share_ctrl->vfebase +
+						VFE_AXI_CMD);
 				printk("Halt done\n");
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 				msm_camera_io_w(0x000003EF, axi_ctrl->share_ctrl->vfebase + 0x4);
+#else
+				msm_camera_io_w_mb(VFE_RESET_UPON_STOP_CMD,
+					axi_ctrl->share_ctrl->vfebase +
+						VFE_GLOBAL_RESET);
+#endif
 				atomic_set(&recovery_active, 1);
 			}
 
 			if(!atomic_read(&recovery_active))
-				v4l2_subdev_notify(&axi_ctrl->subdev,
-						NOTIFY_AXI_IRQ,
-						(void *)qcmd->vfeInterruptStatus0);
+			v4l2_subdev_notify(&axi_ctrl->subdev,
+				NOTIFY_AXI_IRQ,
+				(void *)qcmd->vfeInterruptStatus0);
 		}
 
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		if (atomic_read(&axi_ctrl->share_ctrl->vstate) && !atomic_read(&recovery_active)) {
 			if (qcmd->vfeInterruptStatus1 &
 					VFE32_IMASK_VFE_ERROR_ONLY_1) {
@@ -5640,63 +5871,12 @@ static void axi32_do_tasklet(unsigned long data)
 							(void *)VFE_IRQ_STATUS0_SYNC_TIMER2);
 			}
 		}
-#else
-		if (qcmd->vfeInterruptStatus0 &
-				VFE_IRQ_STATUS0_CAMIF_SOF_MASK) {
-			if (stat_interrupt)
-				vfe32_ctrl->simultaneous_sof_stat = 1;
-			v4l2_subdev_notify(&vfe32_ctrl->subdev,
-				NOTIFY_VFE_IRQ,
-				(void *)VFE_IRQ_STATUS0_CAMIF_SOF_MASK);
-		}
-
-		/* interrupt to be processed,  *qcmd has the payload.  */
-		if (qcmd->vfeInterruptStatus0 &
-				VFE_IRQ_STATUS0_REG_UPDATE_MASK)
-			v4l2_subdev_notify(&vfe32_ctrl->subdev,
-				NOTIFY_VFE_IRQ,
-				(void *)VFE_IRQ_STATUS0_REG_UPDATE_MASK);
-
-		if (qcmd->vfeInterruptStatus1 &
-				VFE_IRQ_STATUS1_RDI0_REG_UPDATE_MASK)
-			v4l2_subdev_notify(&vfe32_ctrl->subdev,
-				NOTIFY_VFE_IRQ,
-				(void *)VFE_IRQ_STATUS1_RDI0_REG_UPDATE);
-
-		if (qcmd->vfeInterruptStatus1 &
-				VFE_IRQ_STATUS1_RDI1_REG_UPDATE_MASK)
-			v4l2_subdev_notify(&vfe32_ctrl->subdev,
-				NOTIFY_VFE_IRQ,
-				(void *)VFE_IRQ_STATUS1_RDI1_REG_UPDATE);
-
-		if (qcmd->vfeInterruptStatus1 &
-				VFE_IRQ_STATUS1_RDI2_REG_UPDATE_MASK)
-			v4l2_subdev_notify(&vfe32_ctrl->subdev,
-				NOTIFY_VFE_IRQ,
-				(void *)VFE_IRQ_STATUS1_RDI2_REG_UPDATE);
-
-		if (qcmd->vfeInterruptStatus1 &
-				VFE_IMASK_WHILE_STOPPING_1)
-			v4l2_subdev_notify(&vfe32_ctrl->subdev,
-				NOTIFY_VFE_IRQ,
-				(void *)VFE_IMASK_WHILE_STOPPING_1);
-
-		if (atomic_read(&axi_ctrl->share_ctrl->handle_common_irq)) {
-			if (qcmd->vfeInterruptStatus1 &
-					VFE32_IMASK_COMMON_ERROR_ONLY_1) {
-				pr_err("irq	errorIrq\n");
-				vfe32_process_common_error_irq(
-					axi_ctrl,
-					qcmd->vfeInterruptStatus1 &
-					VFE32_IMASK_COMMON_ERROR_ONLY_1);
-			}
-
-			v4l2_subdev_notify(&axi_ctrl->subdev,
-				NOTIFY_AXI_IRQ,
-				(void *)qcmd->vfeInterruptStatus0);
-		}
 
 		if (atomic_read(&axi_ctrl->share_ctrl->vstate)) {
+#else
+		if (atomic_read(&axi_ctrl->share_ctrl->vstate) &&
+					!atomic_read(&recovery_active)) {
+#endif
 			if (qcmd->vfeInterruptStatus1 &
 					VFE32_IMASK_VFE_ERROR_ONLY_1) {
 				pr_err("irq	errorIrq\n");
@@ -5778,8 +5958,10 @@ static void axi32_do_tasklet(unsigned long data)
 					(void *)VFE_IRQ_STATUS0_SYNC_TIMER2);
 			}
 		}
-#endif
 		vfe32_ctrl->simultaneous_sof_stat = 0;
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+		axi_ctrl->simultaneous_sof_frame = 0;
+#endif
 		kfree(qcmd);
 	}
 	CDBG("=== axi32_do_tasklet end ===\n");
@@ -5787,7 +5969,7 @@ static void axi32_do_tasklet(unsigned long data)
 
 static irqreturn_t vfe32_parse_irq(int irq_num, void *data)
 {
-	unsigned long flags = 0;
+	unsigned long flags;
 	struct vfe32_irq_status irq;
 	struct vfe32_isr_queue_cmd *qcmd;
 	struct axi_ctrl_t *axi_ctrl = data;
@@ -5810,17 +5992,11 @@ static irqreturn_t vfe32_parse_irq(int irq_num, void *data)
 	}
 
 	spin_lock_irqsave(&axi_ctrl->share_ctrl->stop_flag_lock, flags);
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
-	if (axi_ctrl->share_ctrl->stop_ack_pending || atomic_read(&recovery_active)) {
+	if (axi_ctrl->share_ctrl->stop_ack_pending ||
+			atomic_read(&recovery_active)) {
 		irq.vfeIrqStatus0 &= VFE_IMASK_WHILE_STOPPING_0;
 		irq.vfeIrqStatus1 &= VFE_IMASK_WHILE_STOPPING_1;
 	}
-#else
-	if (axi_ctrl->share_ctrl->stop_ack_pending) {
-		irq.vfeIrqStatus0 &= VFE_IMASK_WHILE_STOPPING_0;
-		irq.vfeIrqStatus1 &= VFE_IMASK_WHILE_STOPPING_1;
-	}
-#endif
 	spin_unlock_irqrestore(&axi_ctrl->share_ctrl->stop_flag_lock, flags);
 
 	CDBG("vfe_parse_irq: Irq_status0 = 0x%x, Irq_status1 = 0x%x.\n",
@@ -5835,17 +6011,42 @@ static irqreturn_t vfe32_parse_irq(int irq_num, void *data)
 		pr_err("axi recovery_active(%d)\n", atomic_read(&recovery_active));
 		recover_irq_mask0 = msm_camera_io_r(axi_ctrl->share_ctrl->vfebase + VFE_IRQ_MASK_0);
 		recover_irq_mask1 = msm_camera_io_r(axi_ctrl->share_ctrl->vfebase + VFE_IRQ_MASK_1);
+#else
+        if (atomic_read(&fault_recovery)) {
+		printk("Start fault recovery\n");
+#endif
 		msm_camera_io_w(0x0, axi_ctrl->share_ctrl->vfebase + VFE_IRQ_MASK_0);
 		msm_camera_io_w((0x1 << 23), axi_ctrl->share_ctrl->vfebase + VFE_IRQ_MASK_1);
 		msm_camera_io_w(VFE_CLEAR_ALL_IRQS, axi_ctrl->share_ctrl->vfebase + VFE_IRQ_CLEAR_0);
 		msm_camera_io_w(VFE_CLEAR_ALL_IRQS, axi_ctrl->share_ctrl->vfebase + VFE_IRQ_CLEAR_1);
 		msm_camera_io_w(0x2, axi_ctrl->share_ctrl->vfebase + 0x1E0);
 		msm_camera_io_w(AXI_HALT, axi_ctrl->share_ctrl->vfebase + VFE_AXI_CMD);
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+	} else if ((qcmd->vfeInterruptStatus1 & 0x3FFF00) && !atomic_read(&recovery_active)) {
+		printk("Start bus overflow recovery\n");
+
+		recover_irq_mask0 = msm_camera_io_r(
+			axi_ctrl->share_ctrl->vfebase + VFE_IRQ_MASK_0);
+		recover_irq_mask1 = msm_camera_io_r(
+			axi_ctrl->share_ctrl->vfebase + VFE_IRQ_MASK_1);
+		/* Clear all IRQs from MASK 0 */
+		msm_camera_io_w(0x0, axi_ctrl->share_ctrl->vfebase + VFE_IRQ_MASK_0);
+		/* Clear all IRQs from MASK 1 except RESET IRQ */
+		msm_camera_io_w((0x1 << 23),
+			axi_ctrl->share_ctrl->vfebase + VFE_IRQ_MASK_1);
+		msm_camera_io_w(VFE_CLEAR_ALL_IRQS,
+			axi_ctrl->share_ctrl->vfebase + VFE_IRQ_CLEAR_0);
+		msm_camera_io_w(VFE_CLEAR_ALL_IRQS,
+			axi_ctrl->share_ctrl->vfebase + VFE_IRQ_CLEAR_1);
+		/* Disable CAMIF capture */
+		msm_camera_io_w(0x2, axi_ctrl->share_ctrl->vfebase +
+			VFE_CAMIF_COMMAND);
+		msm_camera_io_w(AXI_HALT,
+			axi_ctrl->share_ctrl->vfebase + VFE_AXI_CMD);
+#endif
 		wmb();
 		atomic_set(&recovery_active, 2);
 	}
-#endif
-
 	spin_lock_irqsave(&axi_ctrl->tasklet_lock, flags);
 	list_add_tail(&qcmd->list, &axi_ctrl->tasklet_q);
 
@@ -5980,11 +6181,6 @@ static long msm_vfe_subdev_ioctl(struct v4l2_subdev *sd,
 	struct vfe_cmd_stats_buf *scfg = NULL;
 	struct vfe_cmd_stats_ack *sack = NULL;
 
-	if (!vfe32_ctrl->share_ctrl->vfebase) {
-		pr_err("%s: base address unmapped\n", __func__);
-		return -EFAULT;
-	}
-
 	CDBG("%s\n", __func__);
 	if (subdev_cmd == VIDIOC_MSM_VFE_INIT) {
 		CDBG("%s init\n", __func__);
@@ -5992,10 +6188,17 @@ static long msm_vfe_subdev_ioctl(struct v4l2_subdev *sd,
 	} else if (subdev_cmd == VIDIOC_MSM_VFE_RELEASE) {
 		msm_vfe_subdev_release(sd);
 		return 0;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	} else if (subdev_cmd == VIDIOC_MSM_VFE_STATS_VERSION) {
 		vfe32_ctrl->ver_num.main = *(uint32_t *)arg;
 		return 0;
+#endif
 	}
+	if (!vfe32_ctrl->share_ctrl->vfebase) {
+		pr_err("%s: base address unmapped\n", __func__);
+		return -EFAULT;
+	}
+
 	vfe_params = (struct msm_camvfe_params *)arg;
 	cmd = vfe_params->vfe_cfg;
 	data = vfe_params->data;
@@ -6158,7 +6361,11 @@ vfe32_config_done:
 }
 
 static struct msm_cam_clk_info vfe32_clk_info[] = {
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	{"vfe_clk", 228570000},
+#else
+	{"vfe_clk", /*228570000*/128000000},
+#endif
 	{"vfe_pclk", -1},
 	{"csi_vfe_clk", -1},
 };
@@ -6169,13 +6376,13 @@ static int msm_axi_subdev_s_crystal_freq(struct v4l2_subdev *sd,
 	int rc = 0;
 	int round_rate;
 	struct axi_ctrl_t *axi_ctrl = v4l2_get_subdevdata(sd);
-#if 0	//temp insook0321
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
 	if (axi_ctrl->share_ctrl->dual_enabled) {
 		CDBG("%s Dual camera Enabled hence returning "\
 			"without clock change\n", __func__);
 		return rc;
 	}
-#endif 	
+#endif
 	round_rate = clk_round_rate(axi_ctrl->vfe_clk[0], freq);
 	if (rc < 0) {
 		pr_err("%s: clk_round_rate failed %d\n",
@@ -6200,6 +6407,16 @@ static const struct v4l2_subdev_ops msm_vfe_subdev_ops = {
 	.core = &msm_vfe_subdev_core_ops,
 };
 
+#if defined(CONFIG_MSM_IOMMU) && defined(VFE_IOMMU_FAULT_HANDLER)
+static int vfe_iommu_fault_handler(struct iommu_domain *domain,
+		struct device *dev, unsigned long iova, int flags)
+{
+	pr_err("iommu page fault has happened\n");
+        atomic_set(&fault_recovery, 1);
+	return -ENOSYS;
+}
+#endif
+
 int msm_axi_subdev_init(struct v4l2_subdev *sd,
 	uint8_t dual_enabled)
 {
@@ -6216,9 +6433,14 @@ int msm_axi_subdev_init(struct v4l2_subdev *sd,
 	if (axi_ctrl->share_ctrl->axi_ref_cnt > 1)
 		return rc;
 	axi_ctrl->share_ctrl->dual_enabled = dual_enabled;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	axi_ctrl->share_ctrl->default_dual_enabled = dual_enabled;
 	axi_ctrl->share_ctrl->lp_mode = 0;
 	pr_err("axi %s, %d\n", __func__, __LINE__);
+#else
+	axi_ctrl->share_ctrl->lp_mode = 0;
+        atomic_set(&fault_recovery, 0);
+#endif
 	spin_lock_init(&axi_ctrl->tasklet_lock);
 	INIT_LIST_HEAD(&axi_ctrl->tasklet_q);
 	spin_lock_init(&axi_ctrl->share_ctrl->sd_notify_lock);
@@ -6245,6 +6467,11 @@ int msm_axi_subdev_init(struct v4l2_subdev *sd,
 		goto clk_enable_failed;
 
 #ifdef CONFIG_MSM_IOMMU
+	if (mctl->domain == NULL) {
+		pr_err("%s: iommu domain not initialized\n", __func__);
+		rc = -EINVAL;
+		goto device_imgwr_attach_failed;
+	}
 	rc = iommu_attach_device(mctl->domain, axi_ctrl->iommu_ctx_imgwr);
 	if (rc < 0) {
 		pr_err("%s: imgwr attach failed rc = %d\n", __func__, rc);
@@ -6257,10 +6484,14 @@ int msm_axi_subdev_init(struct v4l2_subdev *sd,
 		rc = -ENODEV;
 		goto device_misc_attach_failed;
 	}
+#ifdef VFE_IOMMU_FAULT_HANDLER
+	iommu_set_fault_handler(mctl->domain,
+                        vfe_iommu_fault_handler);
 #endif
 
 #if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	dtv_update_camera_vector_override(1);
+#endif
 #endif
 
 	msm_camio_bus_scale_cfg(
@@ -6323,9 +6554,20 @@ int msm_vfe_subdev_init(struct v4l2_subdev *sd)
 	vfe32_ctrl->update_rolloff = false;
 	vfe32_ctrl->update_la = false;
 	vfe32_ctrl->update_gamma = false;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	vfe32_ctrl->vfe_sof_count_enable = false;
 	vfe32_ctrl->hfr_mode = HFR_MODE_OFF;
 	vfe32_ctrl->share_ctrl->rdi_comp = VFE_RDI_COMPOSITE;
+#else
+
+	if (vfe32_ctrl->share_ctrl->dual_enabled)
+		vfe32_ctrl->vfe_sof_count_enable = false;
+	else
+		vfe32_ctrl->vfe_sof_count_enable = true;
+
+	vfe32_ctrl->update_abcc = false;
+	vfe32_ctrl->hfr_mode = HFR_MODE_OFF;
+#endif
 
 	memset(&vfe32_ctrl->stats_ctrl, 0,
 		sizeof(struct msm_stats_bufq_ctrl));
@@ -6349,11 +6591,17 @@ void msm_axi_subdev_release(struct v4l2_subdev *sd)
 	if (axi_ctrl->share_ctrl->axi_ref_cnt > 0)
 		return;
 
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	pr_err("axi %s, %d\n", __func__, __LINE__);
+#else
+      atomic_set(&fault_recovery, 0);
+#endif
 	axi_clear_all_interrupts(axi_ctrl->share_ctrl);
 
 	axi_ctrl->share_ctrl->dual_enabled = 0;
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	axi_ctrl->share_ctrl->default_dual_enabled = 0;
+#endif
 	disable_irq(axi_ctrl->vfeirq->start);
 	tasklet_kill(&axi_ctrl->vfe32_tasklet);
 #ifdef CONFIG_MSM_IOMMU
@@ -6402,15 +6650,14 @@ int msm_axi_set_low_power_mode(struct v4l2_subdev *sd, void *arg)
 	if (lp_mode)
 		axi_ctrl->share_ctrl->dual_enabled = 0;
 	else
-		axi_ctrl->share_ctrl->dual_enabled = 
-			axi_ctrl->share_ctrl->default_dual_enabled;
+		axi_ctrl->share_ctrl->dual_enabled = 1;
 	return rc;
 }
 
 void axi_abort(struct axi_ctrl_t *axi_ctrl)
 {
 	uint8_t  axi_busy_flag = true;
-	unsigned long flags = 0;
+	unsigned long flags;
 	/* axi halt command. */
 
 	spin_lock_irqsave(&axi_ctrl->share_ctrl->stop_flag_lock, flags);
@@ -6838,7 +7085,6 @@ void axi_start(struct msm_cam_media_controller *pmctl,
 		msm_camera_io_w((
 				0x1 << axi_ctrl->share_ctrl->outpath.out2.ch0),
 				axi_ctrl->share_ctrl->vfebase + VFE_BUS_CMD);
-		/* 0x1: Line base, 0x3: Frame base */
 		msm_camera_io_w(0x3, axi_ctrl->share_ctrl->vfebase +
 			vfe32_AXI_WM_CFG[axi_ctrl->share_ctrl->
 			outpath.out2.ch0]);
@@ -6870,7 +7116,6 @@ void axi_start(struct msm_cam_media_controller *pmctl,
 			outpath.out4.ch0]);
 	}
 
-	pr_err("axi %s, %d", __func__, __LINE__);
 	axi_enable_irq(axi_ctrl->share_ctrl);
 
 	if (axi_ctrl->share_ctrl->current_mode & VFE_OUTPUTS_RDI0) {
@@ -7294,6 +7539,12 @@ static int msm_axi_config(struct v4l2_subdev *sd, void __user *arg)
 		}
 		axi_abort(axi_ctrl);
 		break;
+#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
+	case CMD_AXI_STOP_RECOVERY:
+		pr_err("bus overflow recovery is stopped to avoid IOMMU page faults\n");
+		atomic_set(&fault_recovery, 1);
+		break;
+#endif
 	default:
 		pr_err("%s Unsupported AXI configuration %x ", __func__,
 			cfgcmd.cmd_type);
