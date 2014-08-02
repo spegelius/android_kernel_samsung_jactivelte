@@ -8141,6 +8141,7 @@ static irqreturn_t tabla_slimbus_irq(int irq, void *data)
 	int i, j, port_id, k, ch_mask_temp;
 	unsigned long slimbus_value;
 	u8 val;
+	struct tabla_codec_dai_data *dais;
 
 	for (i = 0; i < WCD9XXX_SLIM_NUM_PORT_REG; i++) {
 		slimbus_value = wcd9xxx_interface_reg_read(codec->control_data,
@@ -8158,15 +8159,16 @@ static irqreturn_t tabla_slimbus_irq(int irq, void *data)
 				pr_debug("%s: port %x disconnect value %x\n",
 					__func__, i*8 + j, val);
 				port_id = i*8 + j;
+				dais = &tabla_p->dai[0];
 				for (k = 0; k < ARRAY_SIZE(tabla_dai); k++) {
 					ch_mask_temp = 1 << port_id;
 					if (ch_mask_temp &
-						tabla_p->dai[k].ch_mask) {
-						tabla_p->dai[k].ch_mask &=
+						dais[k].ch_mask) {
+						dais[k].ch_mask &=
 								~ch_mask_temp;
-					if (!tabla_p->dai[k].ch_mask)
+					if (!dais[k].ch_mask)
 							wake_up(
-						&tabla_p->dai[k].dai_wait);
+						&dais[k].dai_wait);
 					}
 				}
 			}
@@ -9018,6 +9020,7 @@ static int tabla_codec_remove(struct snd_soc_codec *codec)
 {
 	int i;
 	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+	const struct tabla_codec_dai_data *dais;
 
 	wake_lock_destroy(&tabla->irq_resend_wlock);
 
@@ -9030,10 +9033,13 @@ static int tabla_codec_remove(struct snd_soc_codec *codec)
 	tabla_codec_disable_clock_block(codec);
 	TABLA_RELEASE_LOCK(tabla->codec_resource_lock);
 	tabla_codec_enable_bandgap(codec, TABLA_BANDGAP_OFF);
+
+	dais = &tabla->dai[0];
+
 	if (tabla->mbhc_fw)
 		release_firmware(tabla->mbhc_fw);
 	for (i = 0; i < ARRAY_SIZE(tabla_dai); i++)
-		kfree(tabla->dai[i].ch_num);
+		kfree(dais[i].ch_num);
 	mutex_destroy(&tabla->codec_resource_lock);
 #ifdef CONFIG_DEBUG_FS
 	debugfs_remove(tabla->debugfs_poke);
