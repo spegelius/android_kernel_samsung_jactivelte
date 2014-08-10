@@ -357,6 +357,9 @@ void msm_restart(char mode, const char *cmd)
 				&& !kstrtoul(cmd + 7, 0, &value)) {
 			__raw_writel(0xfedc0000 | value, restart_reason);
 #endif
+		} else if (strlen(cmd) == 0) {
+			printk(KERN_NOTICE "%s : value of cmd is NULL.\n", __func__);
+			__raw_writel(0x12345678, restart_reason);
 		} else {
 			__raw_writel(0x77665501, restart_reason);
 		}
