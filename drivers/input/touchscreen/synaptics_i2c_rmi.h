@@ -25,17 +25,18 @@
 /*#define dev_dbg(dev, fmt, arg...) dev_info(dev, fmt, ##arg)*/
 
 /* DVFS feature : TOUCH BOOSTER */
-#ifdef CONFIG_SEC_DVFS_BOOSTER
 #define TSP_BOOSTER
-#endif
 #ifdef TSP_BOOSTER
+#define DVFS_STAGE_NINTH		9
 #define DVFS_STAGE_DUAL		2
 #define DVFS_STAGE_SINGLE	1
 #define DVFS_STAGE_NONE		0
 #include <linux/cpufreq.h>
 
-#define TOUCH_BOOSTER_OFF_TIME	3000
-#define TOUCH_BOOSTER_CHG_TIME	300
+#define TOUCH_BOOSTER_OFF_TIME	300
+#define TOUCH_BOOSTER_CHG_TIME	200
+#define TOUCH_BOOSTER_HIGH_OFF_TIME	1000
+#define TOUCH_BOOSTER_HIGH_CHG_TIME	500
 #endif
 
 /* To support suface touch, firmware should support data
@@ -296,6 +297,7 @@ struct synaptics_rmi4_data {
 	int fw_version_of_bin;		/* firmware version of binary */
 	int fw_release_date_of_ic;	/* Config release data from IC */
 	int panel_revision;		/* Octa panel revision */
+	int factory_read_panel_wakeup;
 	bool doing_reflash;
 
 #ifdef CONFIG_GLOVE_TOUCH

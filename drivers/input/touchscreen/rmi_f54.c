@@ -2394,7 +2394,7 @@ static int check_rx_tx_num(void)
 			__func__, data->cmd_param[0], data->cmd_param[1]);
 		node = -1;
 	} else {
-#if defined(CONFIG_MACH_JACTIVE_EUR) || defined(CONFIG_MACH_JACTIVE_ATT)
+#if defined(CONFIG_MACH_JACTIVE_EUR)
 		node = data->cmd_param[0] * rmi4_data->num_of_rx +
 						data->cmd_param[1];
 #else
@@ -3064,23 +3064,21 @@ static void boost_level(void)
 {
 	struct factory_data *data = f54->factory_data;
 	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
-#ifdef TSP_BOOSTER
 	int retval;
-#endif
+
 	dev_info(&rmi4_data->i2c_client->dev, "%s\n", __func__);
 
 	set_default_result(data);
 
-#ifdef TSP_BOOSTER
 	rmi4_data->dvfs_boost_mode = data->cmd_param[0];
 
 	dev_info(&rmi4_data->i2c_client->dev,
 			"%s: dvfs_boost_mode = %d\n",
 			__func__, rmi4_data->dvfs_boost_mode);
-#endif
+
 	snprintf(data->cmd_buff, sizeof(data->cmd_buff), "OK");
 	data->cmd_state = CMD_STATUS_OK;
-#ifdef TSP_BOOSTER
+
 	if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_NONE) {
 			retval = set_freq_limit(DVFS_TOUCH_ID, -1);
 			if (retval < 0) {
@@ -3093,7 +3091,6 @@ static void boost_level(void)
 				rmi4_data->dvfs_lock_status = false;
 			}
 	}
-#endif
 
 	set_cmd_result(data, data->cmd_buff, strlen(data->cmd_buff));
 
