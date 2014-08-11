@@ -82,7 +82,7 @@
 
 #define	MAX_NUM_LEDS	3
 
-u8 LED_DYNAMIC_CURRENT = 0x28;
+u8 LED_DYNAMIC_CURRENT = 0x8;
 u8 LED_LOWPOWER_MODE = 0x0;
 
 static struct an30259_led_conf led_conf[] = {
@@ -331,9 +331,9 @@ static void an30259a_start_led_pattern(int mode)
 
 	/* Set to low power consumption mode */
 	if (LED_LOWPOWER_MODE == 1)
-		LED_DYNAMIC_CURRENT = 0x9;
+		LED_DYNAMIC_CURRENT = 0x8;
 	else
-		LED_DYNAMIC_CURRENT = 0x48;
+		LED_DYNAMIC_CURRENT = 0x1;
 
 	switch (mode) {
 	/* leds_set_slope_mode(client, LED_SEL, DELAY,  MAX, MID, MIN,
@@ -341,13 +341,13 @@ static void an30259a_start_led_pattern(int mode)
 	case CHARGING:
 		pr_info("LED Battery Charging Pattern on\n");
 		leds_on(LED_R, true, false,
-					LED_DYNAMIC_CURRENT);
+					LED_R_CURRENT / LED_DYNAMIC_CURRENT);
 		break;
 
 	case CHARGING_ERR:
 		pr_info("LED Battery Charging error Pattern on\n");
 		leds_on(LED_R, true, true,
-					LED_DYNAMIC_CURRENT);
+					LED_R_CURRENT / LED_DYNAMIC_CURRENT);
 		leds_set_slope_mode(client, LED_R,
 				1, 15, 15, 0, 1, 1, 0, 0, 0, 0);
 		break;
@@ -355,7 +355,7 @@ static void an30259a_start_led_pattern(int mode)
 	case MISSED_NOTI:
 		pr_info("LED Missed Notifications Pattern on\n");
 		leds_on(LED_B, true, true,
-					LED_DYNAMIC_CURRENT);
+					LED_B_CURRENT / LED_DYNAMIC_CURRENT);
 		leds_set_slope_mode(client, LED_B,
 					10, 15, 15, 0, 1, 10, 0, 0, 0, 0);
 		break;
@@ -363,7 +363,7 @@ static void an30259a_start_led_pattern(int mode)
 	case LOW_BATTERY:
 		pr_info("LED Low Battery Pattern on\n");
 		leds_on(LED_R, true, true,
-					LED_DYNAMIC_CURRENT);
+					LED_R_CURRENT / LED_DYNAMIC_CURRENT);
 		leds_set_slope_mode(client, LED_R,
 					10, 15, 15, 0, 1, 10, 0, 0, 0, 0);
 		break;
@@ -371,13 +371,13 @@ static void an30259a_start_led_pattern(int mode)
 	case FULLY_CHARGED:
 		pr_info("LED full Charged battery Pattern on\n");
 		leds_on(LED_G, true, false,
-					LED_DYNAMIC_CURRENT);
+					LED_G_CURRENT / LED_DYNAMIC_CURRENT);
 		break;
 
 	case POWERING:
 		pr_info("LED Powering Pattern on\n");
-		leds_on(LED_G, true, true, LED_DYNAMIC_CURRENT);
-		leds_on(LED_B, true, true, LED_DYNAMIC_CURRENT);
+		leds_on(LED_G, true, true, LED_G_CURRENT);
+		leds_on(LED_B, true, true, LED_B_CURRENT);
 		leds_set_slope_mode(client, LED_G,
 				0, 8, 4, 1, 2, 2, 3, 3, 3, 3);
 		leds_set_slope_mode(client, LED_B,
@@ -409,6 +409,16 @@ static void an30259a_set_led_blink(enum an30259a_led_enum led,
 	if (brightness > LED_MAX_CURRENT)
 		brightness = LED_MAX_CURRENT;
 
+	if (led == LED_R)
+		LED_DYNAMIC_CURRENT = LED_R_CURRENT;
+	else if (led == LED_G)
+		LED_DYNAMIC_CURRENT = LED_G_CURRENT;
+	else if (led == LED_B)
+		LED_DYNAMIC_CURRENT = LED_B_CURRENT;
+
+	/* In user case, LED current is restricted */
+	brightness = (brightness * LED_DYNAMIC_CURRENT) / LED_MAX_CURRENT;
+
 	if (delay_on_time > SLPTT_MAX_VALUE)
 		delay_on_time = SLPTT_MAX_VALUE;
 
@@ -423,12 +433,12 @@ static void an30259a_set_led_blink(enum an30259a_led_enum led,
 	} else
 		leds_on(led, true, true, brightness);
 
-	leds_set_slope_mode(client, led, 0, 15, 7, 0,
+	leds_set_slope_mode(client, led, 0, 15, 15, 0,
 				(delay_on_time + AN30259A_TIME_UNIT - 1) /
 				AN30259A_TIME_UNIT,
 				(delay_off_time + AN30259A_TIME_UNIT - 1) /
 				AN30259A_TIME_UNIT,
-				1, 1, 1, 1);
+				0, 0, 0, 0);
 }
 
 static ssize_t store_an30259a_led_lowpower(struct device *dev,
@@ -814,6 +824,7 @@ static int __devinit an30259a_probe(struct i2c_client *client,
 {
 	struct an30259a_data *data;
 	int ret, i;
+
 	dev_dbg(&client->adapter->dev, "%s\n", __func__);
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		dev_err(&client->dev, "need I2C_FUNC_I2C.\n");

@@ -263,9 +263,9 @@ static void max77693_set_input_current(struct max77693_charger_data *charger,
 				if ((chg_state != POWER_SUPPLY_STATUS_CHARGING) &&
 						(chg_state != POWER_SUPPLY_STATUS_FULL))
 					break;
-				/* under 500mA, slow rate */
-				if (set_current_reg < (500 / 20) &&
-						(charger->cable_type == POWER_SUPPLY_TYPE_MAINS))
+				/* under 400mA, slow rate */
+				if (set_current_reg < (400 / 20) &&
+						(charger->cable_type != POWER_SUPPLY_TYPE_BATTERY))
 					charger->aicl_on = true;
 				else
 					charger->aicl_on = false;
@@ -319,9 +319,9 @@ static void max77693_set_input_current(struct max77693_charger_data *charger,
 					(chg_state != POWER_SUPPLY_STATUS_FULL))
 				goto exit;
 			if (curr_step < 2) {
-				/* under 500mA, slow rate */
-				if (now_current_reg < (500 / 20) &&
-						(charger->cable_type == POWER_SUPPLY_TYPE_MAINS))
+				/* under 400mA, slow rate */
+				if (now_current_reg < (400 / 20) &&
+						(charger->cable_type != POWER_SUPPLY_TYPE_BATTERY))
 					charger->aicl_on = true;
 				else
 					charger->aicl_on = false;
