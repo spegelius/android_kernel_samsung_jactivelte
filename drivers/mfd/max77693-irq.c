@@ -199,6 +199,17 @@ clear_retry:
 				&irq_reg[CHG_INT]);
 		pr_info("%s: charger interrupt(0x%02x)\n",
 			__func__, irq_reg[CHG_INT]);
+		/* mask chgin to prevent wcin infinite interrupt
+		 * wcin is unmasked wcin isr
+		 */
+		if (irq_reg[CHG_INT] & max77693_irqs[MAX77693_CHG_IRQ_WCIN_I].mask) {
+			u8 reg_data;
+			max77693_read_reg(max77693->i2c,
+				MAX77693_CHG_REG_CHG_INT_MASK, &reg_data);
+			reg_data |= (1 << 5);
+			max77693_write_reg(max77693->i2c,
+				MAX77693_CHG_REG_CHG_INT_MASK, reg_data);
+		}
 	}
 
 	if (irq_src & MAX77693_IRQSRC_TOP) {
